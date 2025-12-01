@@ -7,15 +7,15 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 from __future__ import annotations
 
-project = 'usask_arg_example'
+project = 'skZemax'
 copyright = '2024, USask-ARG'
 author = 'USask-ARG'
-github_url = ''
+github_url = 'https://github.com/usask-arg/skZemax'
 
 from importlib.metadata import version as get_version
 
-release: str = get_version(project)
-# for example take major/minor
+# release: str = get_version(project)
+release: str = ""
 version: str = ".".join(release.split('.')[:2])
 
 # -- General configuration ---------------------------------------------------
@@ -89,15 +89,15 @@ myst_enable_extensions = [
     # "substitution",
 ]
 
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3/", None),
-    "pandas": ("https://pandas.pydata.org/pandas-docs/stable", None),
-    "numpy": ("https://numpy.org/doc/stable", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy", None),
-    "matplotlib": ("https://matplotlib.org/stable/", None),
-    "dask": ("https://docs.dask.org/en/latest", None),
-    "sparse": ("https://sparse.pydata.org/en/latest/", None),
-    "xarray-tutorial": ("https://tutorial.xarray.dev/", None),
-    "xarray": ("https://docs.xarray.dev/en/stable/", None)
+# intersphinx_mapping = {
+#     "python": ("https://docs.python.org/3/", None),
+#     "pandas": ("https://pandas.pydata.org/pandas-docs/stable", None),
+#     "numpy": ("https://numpy.org/doc/stable", None),
+#     "scipy": ("https://docs.scipy.org/doc/scipy", None),
+#     "matplotlib": ("https://matplotlib.org/stable/", None),
+#     "dask": ("https://docs.dask.org/en/latest", None),
+#     "sparse": ("https://sparse.pydata.org/en/latest/", None),
+    # "xarray-tutorial": ("https://tutorial.xarray.dev/", None),
+    # "xarray": ("https://docs.xarray.dev/en/stable/", None)
     # "opt_einsum": ("https://dgasmith.github.io/opt_einsum/", None),
-}
+# }
