@@ -4,7 +4,7 @@
 {% set py_version = environ['CONDA_PY'] %}
 
 package:
-  name: skZemax
+  name: skzemax
   version: {{ version }}
 
 source:
