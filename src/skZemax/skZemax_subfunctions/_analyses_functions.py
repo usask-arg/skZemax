@@ -6,7 +6,11 @@ from skZemax.skZemax_subfunctions._system_functions import System_GetMode
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from typing import Union
 from skZemax.skZemax_subfunctions._LDE_functions import ZOSAPI_Editors_LDE_ILDERow, _convert_raw_surface_input_
+from skZemax.skZemax_subfunctions._field_functions import ZOSAPI_SystemData_IField, _convert_raw_field_input_
+from skZemax.skZemax_subfunctions._wavelength_functions import ZOSAPI_SystemData_IWavelength, _convert_raw_wavelength_input_
+from skZemax.skZemax_subfunctions._MCE_functions import MCE_GetCurrentConfig, MCE_SetActiveConfig
 from pathlib import Path
+import xarray as xr
 
 type ZOSAPI_Analysis_Data_IA  = object #<- ZOSAPI.Analysis.IA_ # The actual module is referenced by the base PythonStandaloneApplication class.
 type ZOSAPI_Analysis_Data_IAR = object #<- ZOSAPI.Analysis.Data.IAR_ # The actual module is referenced by the base PythonStandaloneApplication class.
@@ -215,6 +219,100 @@ def Analyses_ReportSurfacePrescription(self, in_Surface: Union[int, ZOSAPI_Edito
     with open(save_path, 'r') as file:
         content = file.read()
     return [x for x in content.replace('\x00', '').strip('ÿþ').split('\n') if len(x)>0]
+
+def Analyses_Footprint(self,
+                       in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow],
+                       delete_vignetted:bool=False)->xr.Dataset:
+    """
+    Produces a footprint diagram. 
+    
+    ZOI-API interface for the footprint analysis is extremely limited. Data is only saved to a textfile of:
+        Ray X Minimum
+        Ray X Maximum
+        Ray Y Minimum
+        Ray Y Maximum
+        Maximum Radius
+        Ray X Center
+        Ray Y Center
+        Ray X Half Width
+        Ray Y Half Width
+        Wavelength
+    as an aggregate of all the wavelengths/fields/configurations being looked at. 
+
+        Note that this information does not capture any footprint descriptions beyond plotting an ellipse.
+        Any more realistic ray-tracing is lost through the ZOS-API and needs to be examined directly in Zemax.
+    
+    This function loops through all fields/wavelengths/configurations individually and records the above information in an xarray for user analysis.
+    See :func:`AnalysisPlotting_Footprint`.
+
+    :param in_Surface: The surface to study. Can be an index or LDE surface object.
+    :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
+    :param delete_vignetted: If True wil delete vignetted ray, defaults to False
+    :type delete_vignetted: bool, optional
+    """
+    CURRENT_VERBOSE   = bool(self._verbose)
+    self._verbose     = False
+    CURRENT_CONFIG    = int(self.MCE_GetCurrentConfig())
+    save_path = self.Utilities_AnalysesFilesDir() + os.sep + 'Footprint.txt'
+    blank_array = np.ones((self.MCE_GetNumberOfConfigs(), self.Wavelength_GetNumberOfWavelengths(), self.Fields_GetNumberOfFields()))*np.nan
+    out = xr.Dataset(
+        {
+                'x_min'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'x_max'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'y_min'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'y_max'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'rad_max'             : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'x_cntr'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'y_cntr'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'x_half'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'y_half'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'wavelength_um'       : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+        },
+        coords =
+        {
+                "configuration_index" : ('conf', np.array(np.arange(1, self.MCE_GetNumberOfConfigs()+1, 1))),
+                "wavelength_index"    : ('wvln', np.array(np.arange(1, self.Wavelength_GetNumberOfWavelengths()+1, 1))),
+                "field_index"         : ('fld', np.array(np.arange(1, self.Fields_GetNumberOfFields()+1, 1))),
+        })
+    out.attrs = {'Surface' : _convert_raw_surface_input_(self, in_surface=in_Surface, return_index=True)}
+    footprint_options                           = dict()
+    footprint_options['FOO_SURFACE']            = int(out.attrs['Surface'])
+    footprint_options['FOO_RAYDENSITY']         = 0 # Ring pattern
+    footprint_options['FOO_DELETEVIGNETTED']    = bool(delete_vignetted)
+    if CURRENT_VERBOSE: cp('!@lg!@Analyses_Footprint :: Running analysis [!@lm!@{}!@lg!@] ...'.format("FootprintSettings"))
+    for confidx in np.arange(1, self.MCE_GetNumberOfConfigs()+1, 1):
+        self.MCE_SetActiveConfig(int(confidx))
+        for wvidx in np.arange(1, self.Wavelength_GetNumberOfWavelengths()+1, 1):
+            for fldidx in np.arange(1, self.Fields_GetNumberOfFields()+1, 1):  
+                footprint_options['FOO_FIELD']        = fldidx
+                footprint_options['FOO_WAVELENGTH']   = wvidx
+                result                                = self.Analyses_RunAnalysesAndGetResults(analysis='Footprint', analysis_settings=footprint_options)
+                result.GetTextFile(save_path)
+                with open(save_path, 'r') as file:
+                    content = file.read()
+                content = [x for x in content.replace('\x00', '').strip('ÿþ').split('\n') if len(x)>0]
+                try:
+                    out.attrs['File']                                 = content[1]
+                    out.attrs['Date']                                 = content[3] 
+                    out.x_min[confidx-1, wvidx-1, fldidx-1]           = float(content[6].split('\t')[-1].strip(' '))
+                    out.x_max[confidx-1, wvidx-1, fldidx-1]           = float(content[7].split('\t')[-1].strip(' '))
+                    out.y_min[confidx-1, wvidx-1, fldidx-1]           = float(content[8].split('\t')[-1].strip(' '))
+                    out.y_max[confidx-1, wvidx-1, fldidx-1]           = float(content[9].split('\t')[-1].strip(' '))
+                    out.rad_max[confidx-1, wvidx-1, fldidx-1]         = float(content[10].split('\t')[-1].strip(' '))
+                    out.x_cntr[confidx-1, wvidx-1, fldidx-1]          = float(content[11].split('\t')[-1].strip(' '))
+                    out.y_cntr[confidx-1, wvidx-1, fldidx-1]          = float(content[12].split('\t')[-1].strip(' '))
+                    out.x_half[confidx-1, wvidx-1, fldidx-1]          = float(content[13].split('\t')[-1].strip(' '))
+                    out.y_half[confidx-1, wvidx-1, fldidx-1]          = float(content[14].split('\t')[-1].strip(' '))
+                    out.wavelength_um[confidx-1, wvidx-1, fldidx-1]   = float(content[15].split('\t')[-1].strip(' ').split(' ')[0])
+                except:
+                    pass
+    if CURRENT_VERBOSE: cp('!@lg!@Analyses_Footprint :: Done.')
+    # Reset to settings before loop
+    self._verbose = CURRENT_VERBOSE
+    self.MCE_SetActiveConfig(int(CURRENT_CONFIG))
+    return out
+                    
+        
 
 def Analyses_FFTMTF(self,
                        wavelength_index:int=0,

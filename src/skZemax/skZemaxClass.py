@@ -17,9 +17,9 @@ class skZemaxClass(PythonStandaloneApplication):
         super(skZemaxClass, self).__init__(path=path)
         self._verbose = verbose
     from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _CheckIfStringValidInDir_, _convert_raw_input_worker_, _SetAttrByStringIfValid_, __LowLevelZemaxStringCheck__
-    from skZemax.skZemax_subfunctions._analyses_functions import Analyses_FFTMTF, Analyses_GetNamesOfAllAnalyses, Analyses_ReportSurfacePrescription, Analyses_ReportSystemPrescription, \
+    from skZemax.skZemax_subfunctions._analyses_functions import Analyses_FFTMTF, Analyses_GetNamesOfAllAnalyses, Analyses_ReportSurfacePrescription, Analyses_Footprint, Analyses_ReportSystemPrescription, \
         Analyses_RunAnalysesAndGetResults, _Analyses_GetZOSObjectAndSettings_, _Analysis_SetZOSObjectSettingsByBinaryAlteration_, _Analysis_SetZOSObjectSettingsByDict_
-    from skZemax.skZemax_subfunctions._analyses_plotting_functions import AnalysesPlotting_FFTMTF, AnalysesPlotting_LinePlotByField
+    from skZemax.skZemax_subfunctions._analyses_plotting_functions import AnalysisPlotting_Footprint, AnalysesPlotting_FFTMTF, AnalysesPlotting_LinePlotByField
     from skZemax.skZemax_subfunctions._CAD_functions import CAD_ExportSequentialCadSTPFileAs
     from skZemax.skZemax_subfunctions._field_functions import _convert_raw_field_input_, Field_DeleteField, Field_GetField, Fields_AddField, Fields_GetNumberOfFields
     from skZemax.skZemax_subfunctions._LDE_functions import LDE_AddNewSurface, LDE_ChangeApertureToCircular, LDE_ChangeApertureToCircularObscuration, LDE_ChangeApertureToFloating, \
@@ -52,5 +52,6 @@ if __name__ == '__main__':
     import os
     skZemax = skZemaxClass()
     # skZemax.Utilities_OpenZemaxFile(skZemax.SamplesDir() + os.sep + r'Non-sequential\Miscellaneous\Digital_projector_flys_eye_homogenizer.zmx', False)
-    skZemax.Utilities_OpenZemaxFile(skZemax.Utilities_skZemaxExampleDir() + os.sep + r'e01_new_file_and_quickfocus.zmx', False)
-    skZemax.Analyses_ReportSurfacePrescription(2)
+    # skZemax.Utilities_OpenZemaxFile(skZemax.Utilities_skZemaxExampleDir() + os.sep + r'e01_new_file_and_quickfocus.zmx', False)
+    skZemax.Utilities_OpenZemaxFile(r'E:\_OfficerRepositories\ZemaxRepos\skzemax_ali\src\skZemax_ALI\ALIv11_20251126\HoneywellSubmittedFile\ALI_3rdOption_No Fold_v11_FinalSpec_bafflevane_20251111PrismTilted.zmx', False)
+    skZemax.AnalysisPlotting_Footprint(skZemax.Analyses_Footprint(in_Surface=43))
