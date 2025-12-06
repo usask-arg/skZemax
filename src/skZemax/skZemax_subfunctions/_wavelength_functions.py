@@ -31,7 +31,7 @@ def Wavelength_SelectWavelengthPreset(self, preset:str="d_0p587")->None:
     
     See :func:`Wavelength_GetNamesOfAllPresets` to extract the names in python.
 
-    If more than one preset could match the specified string, the first one in the ZOS-API list is taken.
+    If more than one preset could match the specified string, the first one sorted by ascending length, then alphabet, is taken.
 
     :param preset: Name of the preset to use, defaults to "d_0p587"
     :type preset: str, optional

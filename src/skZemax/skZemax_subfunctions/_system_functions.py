@@ -28,7 +28,7 @@ def System_AddMaterialCatalog(self, catalog:str='SCHOTT')->None:
 
     See :func:`System_GetNamesOfAllMaterialCatalogs` to extract the names in python.
 
-    If more than one catalog could match the specified string, the first one in the ZOS-API list is taken.
+    If more than one catalog could match the specified string, the first one sorted by ascending length, then alphabet, is taken
 
     :param catalog: Name of a catalog to add, defaults to 'SCHOTT'
     :type catalog: str, optional

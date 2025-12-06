@@ -307,10 +307,12 @@ def _LDE_GetSurfaceColumns_(self)->tuple:
     :return: the surface column call to access the enumerators, and the sting names of the columns
     :rtype: tuple
     """
-    # Make list of good calls to make for column data
+    all_surface_columns = __LowLevelZemaxStringCheck__(self, self.ZOSAPI.Editors.LDE.SurfaceColumn)
+    # # surface_columns = [x for x in all_surface_columns if 'Par' not in x]
+    # This is just making a nicer order (to match Zemax GUI) of the above 
     surface_columns = ['Comment', 'Radius', 'Thickness', 'Material', 'Coating',
                         'SemiDiameter', 'ChipZone', 'MechanicalSemiDiameter', 'Conic', 'TCE']
-    par_columns    = [x for x in dir(self.ZOSAPI.Editors.LDE.SurfaceColumn) if 'Par' in x and not x.isalpha()]
+    par_columns = [x for x in all_surface_columns if 'Par' in x]
     # Ensure 'ParXX' names are sorted by int in XX
     surface_columns = surface_columns + [y for x, y, in sorted(zip([int(x.strip('Par')) for x in par_columns], par_columns))]
     surface_column_calls = [getattr(self.ZOSAPI.Editors.LDE.SurfaceColumn, x) for x in surface_columns]
@@ -524,3 +526,7 @@ def LDE_SetTiltDecenterAfterSurfaceMode(self, in_Surface: Union[int, ZOSAPI_Edit
              cp('!@ly!@LDE_SetTiltDecenterAfterSurfaceMode :: Problem setting input [!@lm!@{}!@ly!@].'.format(str(mode)))
     else:
         cp('!@ly!@LDE_SetTiltDecenterAfterSurfaceMode :: Expected [!@lm!@string!@ly!@] or [!@lm!@tuple!@ly!@] as input. Got [!@lm!@{}!@ly!@].'.format(str(type(mode))))
+
+def LDE_RunRayTrace(self):
+    raytrace = self.TheSystem.Tools.OpenBatchRayTrace()
+    raytrace.CreateDirectUnpol(total_rays_in_both_axes, ZOSAPI.Tools.RayTrace.RaysType.Real, startSurface, toSurface);

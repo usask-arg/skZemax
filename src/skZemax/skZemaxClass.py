@@ -1,5 +1,7 @@
 from __future__ import annotations
 from skZemax.skZemax_subfunctions._app import PythonStandaloneApplication
+import clr
+import inspect
 
 class skZemaxClass(PythonStandaloneApplication):
     def __init__(self, path=None, verbose:bool=True):
@@ -16,12 +18,19 @@ class skZemaxClass(PythonStandaloneApplication):
         """
         super(skZemaxClass, self).__init__(path=path)
         self._verbose = verbose
+        # To make implementation of raytracing faster, skZemax uses the .dll the 'Help->Help PDF' directs you to: 
+        # https://optics.ansys.com/hc/en-us/articles/42661765866899-Batch-Processing-of-Ray-Trace-Data-using-ZOS-API-in-MATLAB-or-Python
+        # Importing it here
+        clr.AddReference(os.path.abspath(os.sep.join(os.path.abspath(inspect.getfile(skZemaxClass)).split(os.sep)[0:-1]) + os.sep + "ZemaxRaytraceSupplement" + os.sep + 'RayTrace.dll'))
+        import BatchRayTrace
+        self.BatchRayTrace = BatchRayTrace
+    # Adding skZemax_subfunctions to skZemaxClass
     from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _CheckIfStringValidInDir_, _convert_raw_input_worker_, _SetAttrByStringIfValid_, __LowLevelZemaxStringCheck__
     from skZemax.skZemax_subfunctions._analyses_functions import Analyses_FFTMTF, Analyses_GetNamesOfAllAnalyses, Analyses_ReportSurfacePrescription, Analyses_Footprint, Analyses_ReportSystemPrescription, \
         Analyses_RunAnalysesAndGetResults, _Analyses_GetZOSObjectAndSettings_, _Analysis_SetZOSObjectSettingsByBinaryAlteration_, _Analysis_SetZOSObjectSettingsByDict_
     from skZemax.skZemax_subfunctions._analyses_plotting_functions import AnalysisPlotting_Footprint, AnalysesPlotting_FFTMTF, AnalysesPlotting_LinePlotByField
     from skZemax.skZemax_subfunctions._CAD_functions import CAD_ExportSequentialCadSTPFileAs
-    from skZemax.skZemax_subfunctions._field_functions import _convert_raw_field_input_, Field_DeleteField, Field_GetField, Fields_AddField, Fields_GetNumberOfFields
+    from skZemax.skZemax_subfunctions._field_functions import _convert_raw_field_input_, Field_DeleteField, Field_GetField, Fields_AddField, Fields_GetNumberOfFields, Field_SetAllDataOfFieldFromDict, Field_GetAllDataOfField
     from skZemax.skZemax_subfunctions._LDE_functions import LDE_AddNewSurface, LDE_ChangeApertureToCircular, LDE_ChangeApertureToCircularObscuration, LDE_ChangeApertureToFloating, \
         LDE_ChangeApertureToRectangular, LDE_ChangeSurfaceType, LDE_CheckIfSurfaceIsStop, LDE_CopyAndInsertSurfacesFromFile, LDE_GetAllColumnDataOfSurface, LDE_GetApertureTypeSettings,  \
         LDE_GetNamesOfAllApertureTypes, LDE_GetNamesOfAllSurfaceTypes, LDE_GetNumberOfSurfaces, LDE_GetSurface, LDE_GetSurfaceColumnEnum, LDE_InsertNewSurface, LDE_RemoveSurface, \
@@ -53,5 +62,6 @@ if __name__ == '__main__':
     skZemax = skZemaxClass()
     # skZemax.Utilities_OpenZemaxFile(skZemax.SamplesDir() + os.sep + r'Non-sequential\Miscellaneous\Digital_projector_flys_eye_homogenizer.zmx', False)
     # skZemax.Utilities_OpenZemaxFile(skZemax.Utilities_skZemaxExampleDir() + os.sep + r'e01_new_file_and_quickfocus.zmx', False)
-    skZemax.Utilities_OpenZemaxFile(r'E:\_OfficerRepositories\ZemaxRepos\skzemax_ali\src\skZemax_ALI\ALIv11_20251126\HoneywellSubmittedFile\ALI_3rdOption_No Fold_v11_FinalSpec_bafflevane_20251111PrismTilted.zmx', False)
+    skZemax.Utilities_OpenZemaxFile(r'E:\GitReposUSASK\CodeRepos\skzemax_ali\src\skZemax_ALI\ALIv11_20251126\HoneywellSubmittedFile\ALI_3rdOption_No Fold_v11_FinalSpec_bafflevane_20251111PrismTilted.zmx', False)
+    skZemax.Field_GetAllDataOfField(1)
     skZemax.AnalysisPlotting_Footprint(skZemax.Analyses_Footprint(in_Surface=43))

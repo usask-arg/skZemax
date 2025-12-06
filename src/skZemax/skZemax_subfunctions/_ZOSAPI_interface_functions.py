@@ -62,29 +62,32 @@ def _convert_raw_input_worker_(self, in_value: Union[int, Any], object_type: Any
 @staticmethod
 def __LowLevelZemaxStringCheck__(self, 
                                  in_obj,
-                                 extra_include_filter:str=None,
-                                 extra_exclude_filter:str=None,
+                                 extra_include_filter:Union[str, list]=None,
+                                 extra_exclude_filter:Union[str, list]=None,
                                  check_if_upper:bool=False)->list:
     """
     A low level function which produces a list of values given by python's dir() call - after some additional filtering.
 
     :param in_obj: The object for which the contents will be listed.
     :type in_obj: _type_
-    :param extra_include_filter: A string which, if provided, will keep only the elements of the dir() call that have this sequence within it, defaults to None
+    :param extra_include_filter: A string which (or list of strings), if provided, will keep only the elements of the dir() call that have this sequence within it, defaults to None
     :type extra_include_filter: str, optional
-    :param extra_exclude_filter: A string which, if provided, will exclude all the elements of the dir() call that have this sequence within it, defaults to None
+    :param extra_exclude_filter: A string which (or list of strings), if provided, will exclude all the elements of the dir() call that have this sequence within it, defaults to None
     :type extra_exclude_filter: str, optional
     :param check_if_upper: If True, will only keep elements which are all upper cased, defaults to False
     :type check_if_upper: bool, optional
     :return: A list of the objects attributes (after any filtering)
     :rtype: list
     """
-
+    if extra_include_filter is not None and isinstance(extra_include_filter, str):
+        extra_include_filter = list([extra_include_filter])
+    if extra_exclude_filter is not None and isinstance(extra_exclude_filter, str):
+        extra_exclude_filter = list([extra_exclude_filter])
     all_names = [x for x in dir(in_obj) if '__' not in x]
     if extra_include_filter is not None:
-        all_names = [x for x in all_names if extra_include_filter in x]
+        all_names = [x for x in all_names if any(y in x for y in extra_include_filter)]
     if extra_exclude_filter is not None:
-        all_names = [x for x in all_names if extra_exclude_filter not in x]
+        all_names = [x for x in all_names if not any(y in x for y in extra_exclude_filter)]
     if check_if_upper:
         all_names = [x for x in all_names if x.isupper()]
     # Filter out calls one shouldn't use through this function
@@ -96,13 +99,13 @@ def __LowLevelZemaxStringCheck__(self,
             all_names.remove(x)
         except:
             pass
-    return all_names
+    return sorted(all_names, key=lambda item: (len(item), item))
 
 def _CheckIfStringValidInDir_(self, 
                               in_obj:Any, 
                               in_string:str,
-                              extra_include_filter:str=None,
-                              extra_exclude_filter:str=None,
+                              extra_include_filter:Union[str, list]=None,
+                              extra_exclude_filter:Union[str, list]=None,
                               check_if_upper:bool=False)->Any:
     """
     Looks at a Zemax class/module/etc and sees if the given string is an attribute/call within the Zemax code (via a dir() call).
@@ -114,9 +117,9 @@ def _CheckIfStringValidInDir_(self,
     :type in_obj: Any
     :param in_string: The string to find within the object. This is not case sensitive. 
     :type in_string: str
-    :param extra_include_filter: A string which, if provided, will keep only the elements of the dir() call that have this sequence within it, defaults to None
+    :param extra_include_filter: A string which (or list of strings), if provided, will keep only the elements of the dir() call that have this sequence within it, defaults to None
     :type extra_include_filter: str, optional
-    :param extra_exclude_filter: A string which, if provided, will exclude all the elements of the dir() call that have this sequence within it, defaults to None
+    :param extra_exclude_filter: A string which (or list of strings), if provided, will exclude all the elements of the dir() call that have this sequence within it, defaults to None
     :type extra_exclude_filter: str, optional
     :param check_if_upper: If True, will only keep elements - of the object dir() - which are all upper cased, defaults to False
     :type check_if_upper: bool, optional
@@ -140,8 +143,8 @@ def _SetAttrByStringIfValid_(self,
                              in_obj:Any,
                              in_string:str,
                              in_value:Any,
-                             extra_include_filter:str=None,
-                             extra_exclude_filter:str=None,
+                             extra_include_filter:Union[str, list]=None,
+                             extra_exclude_filter:Union[str, list]=None,
                              check_if_upper:bool=False):
     """
     Looks at a Zemax class/module/etc and sees if the given string is an attribute/call within the Zemax code (via a dir() call).
@@ -155,10 +158,10 @@ def _SetAttrByStringIfValid_(self,
     :type in_string: str
     :param in_value: The value one would like to set the attribute/call identified by the in_string.
     :type in_value: Any
-    :param extra_include_filter: A string which, if provided, will keep only the elements of the dir() call that have this sequence within it, defaults to None
-    :type extra_include_filter: str, optional
-    :param extra_exclude_filter: A string which, if provided, will exclude all the elements of the dir() call that have this sequence within it, defaults to None
-    :type extra_exclude_filter: str, optional
+    :param extra_include_filter: A string which (or list of strings), if provided, will keep only the elements of the dir() call that have this sequence within it, defaults to None
+    :type extra_include_filter: Union[str, list], optional
+    :param extra_exclude_filter: A string which (or list of strings), if provided, will exclude all the elements of the dir() call that have this sequence within it, defaults to None
+    :type extra_exclude_filter: Union[str, list], optional
     :param check_if_upper: If True, will only keep elements - of the object dir() - which are all upper cased, defaults to False
     :type check_if_upper: bool, optional
     """

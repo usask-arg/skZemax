@@ -1,5 +1,5 @@
 from typing import Union
-from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _convert_raw_input_worker_
+from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _convert_raw_input_worker_, __LowLevelZemaxStringCheck__, _CheckIfStringValidInDir_, _SetAttrByStringIfValid_
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 
 type ZOSAPI_SystemData_IField = object #<- ZOSAPI.SystemData.IField # The actual module is referenced by the base PythonStandaloneApplication class.
@@ -57,6 +57,34 @@ def Fields_AddField(self, field_x:float, field_y:float, field_weight:float=1.0)-
     :return: The new field object
     :rtype: ZOSAPI_SystemData_IField
     """
-
     return self.TheSystem.SystemData.Fields.AddField(float(field_x), float(field_y), float(field_weight))
 
+def Field_GetAllDataOfField(self, in_field: Union[int, ZOSAPI_SystemData_IField])->dict:
+    """
+    Gets all column data of a Field object and returns it as a dict.
+
+    :param in_field: The Field - either the index or the object.
+    :type in_field: Union[int, ZOSAPI_SystemData_IField]
+    :return: dict of all Field's properties
+    :rtype: dict
+    """
+    field_obj = self._convert_raw_field_input_(in_field, return_index=False)
+    out = dict()
+    for key in __LowLevelZemaxStringCheck__(self, self.ZOSAPI.SystemData.FieldColumn, extra_exclude_filter=['get', 'Get', 'set', 'Set', 'Solve', 'solve']):
+        out[key] = _CheckIfStringValidInDir_(self, field_obj, key, extra_exclude_filter=['get', 'Get', 'set', 'Set', 'Solve', 'solve'])
+    return out
+
+def Field_SetAllDataOfFieldFromDict(self, in_field: Union[int, ZOSAPI_SystemData_IField], Field_dict:dict)->None:
+    """
+    Sets all column data of a Field object and returns it as a dict.
+
+    :param in_field: The Field - either the index or the object.
+    :type in_field: Union[int, ZOSAPI_SystemData_IField]
+    :param Field_dict: dict of Field properties to set (i.e. :func:`Field_GetDataOfField`)
+    :type Field_dict: dict
+    :return: _description_
+    :rtype: dict
+    """
+    field_obj = self._convert_raw_field_input_(in_field, return_index=False)
+    for key in Field_dict.keys():
+        _SetAttrByStringIfValid_(self, key, Field_dict[key], extra_exclude_filter=['get', 'Get', 'set', 'Set', 'Solve', 'solve'])
