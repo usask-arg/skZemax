@@ -2,6 +2,7 @@ import numpy as np
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _convert_raw_input_worker_, __LowLevelZemaxStringCheck__
 from typing import Union
+import xarray as xr
 
 type ZOSAPI_Editors_LDE_ILDERow                 = object #<- ZOSAPI.Editors.LDE.ILDERow # The actual module is referenced by the base PythonStandaloneApplication class.
 type ZOSAPI_Editors_LDE_ISurfaceApertureType    = object #<- ZOSAPI.Editors.LDE.ISurfaceApertureType # The actual module is referenced by the base PythonStandaloneApplication class.
@@ -527,6 +528,29 @@ def LDE_SetTiltDecenterAfterSurfaceMode(self, in_Surface: Union[int, ZOSAPI_Edit
     else:
         cp('!@ly!@LDE_SetTiltDecenterAfterSurfaceMode :: Expected [!@lm!@string!@ly!@] or [!@lm!@tuple!@ly!@] as input. Got [!@lm!@{}!@ly!@].'.format(str(type(mode))))
 
-def LDE_RunRayTrace(self):
-    raytrace = self.TheSystem.Tools.OpenBatchRayTrace()
-    raytrace.CreateDirectUnpol(total_rays_in_both_axes, ZOSAPI.Tools.RayTrace.RaysType.Real, startSurface, toSurface);
+def LDE_BuildRayTraceRays(self,)->xr.Dataset:
+    out = xr.Dataset(
+        {
+                'x_min'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'x_max'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'y_min'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'y_max'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'rad_max'             : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'x_cntr'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'y_cntr'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'x_half'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'y_half'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+                'wavelength_um'       : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+        },
+        coords =
+        {
+                "configuration_index" : ('conf', np.array(np.arange(1, self.MCE_GetNumberOfConfigs()+1, 1))),
+                "wavelength_index"    : ('wvln', np.array(np.arange(1, self.Wavelength_GetNumberOfWavelengths()+1, 1))),
+                "field_index"         : ('fld', np.array(np.arange(1, self.Fields_GetNumberOfFields()+1, 1))),
+        })
+
+
+# def LDE_RunRayTrace(self):
+#     # ZOSAPI.Tools.RayTrace.IBatchRayTrace.GetDirectFieldCoordinates  ( 
+#     raytrace = self.TheSystem.Tools.OpenBatchRayTrace()
+#     raytrace.CreateDirectUnpol(total_rays_in_both_axes, ZOSAPI.Tools.RayTrace.RaysType.Real, startSurface, toSurface);

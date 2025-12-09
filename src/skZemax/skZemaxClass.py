@@ -30,11 +30,13 @@ class skZemaxClass(PythonStandaloneApplication):
         Analyses_RunAnalysesAndGetResults, _Analyses_GetZOSObjectAndSettings_, _Analysis_SetZOSObjectSettingsByBinaryAlteration_, _Analysis_SetZOSObjectSettingsByDict_
     from skZemax.skZemax_subfunctions._analyses_plotting_functions import AnalysisPlotting_Footprint, AnalysesPlotting_FFTMTF, AnalysesPlotting_LinePlotByField
     from skZemax.skZemax_subfunctions._CAD_functions import CAD_ExportSequentialCadSTPFileAs
-    from skZemax.skZemax_subfunctions._field_functions import _convert_raw_field_input_, Field_DeleteField, Field_GetField, Fields_AddField, Fields_GetNumberOfFields, Field_SetAllDataOfFieldFromDict, Field_GetAllDataOfField
+    from skZemax.skZemax_subfunctions._field_functions import _convert_raw_field_input_, Field_DeleteField, Field_GetField, Fields_AddField, Fields_GetNumberOfFields, Field_SetAllDataOfFieldFromDict, \
+        Field_GetAllDataOfField, Field_SetFieldType, Field_GetFieldType, Field_ClearVignettingFactors, Field_SetVignettingFactors, Field_GetNormalization, Field_SetNormalization
     from skZemax.skZemax_subfunctions._LDE_functions import LDE_AddNewSurface, LDE_ChangeApertureToCircular, LDE_ChangeApertureToCircularObscuration, LDE_ChangeApertureToFloating, \
         LDE_ChangeApertureToRectangular, LDE_ChangeSurfaceType, LDE_CheckIfSurfaceIsStop, LDE_CopyAndInsertSurfacesFromFile, LDE_GetAllColumnDataOfSurface, LDE_GetApertureTypeSettings,  \
-        LDE_GetNamesOfAllApertureTypes, LDE_GetNamesOfAllSurfaceTypes, LDE_GetNumberOfSurfaces, LDE_GetSurface, LDE_GetSurfaceColumnEnum, LDE_InsertNewSurface, LDE_RemoveSurface, \
-        LDE_SetAllColumnDataOfSurfaceFromDict, LDE_SetSurfaceAsStop, LDE_SetTiltDecenterAfterSurfaceMode, LDE_SetTiltDecenterOfSurface, _LDE_GetSurfaceCalls_, _LDE_GetSurfaceColumns_, _convert_raw_surface_input_
+            LDE_GetNamesOfAllApertureTypes, LDE_GetNamesOfAllSurfaceTypes, LDE_GetNumberOfSurfaces, LDE_GetSurface, LDE_GetSurfaceColumnEnum, LDE_InsertNewSurface, LDE_RemoveSurface, \
+                LDE_SetAllColumnDataOfSurfaceFromDict, LDE_SetSurfaceAsStop, LDE_SetTiltDecenterAfterSurfaceMode, LDE_SetTiltDecenterOfSurface, _LDE_GetSurfaceCalls_, _LDE_GetSurfaceColumns_, \
+                    _convert_raw_surface_input_, LDE_BuildRayTraceRays
     from skZemax.skZemax_subfunctions._MCE_functions import MCE_AddConfig, MCE_AddConfigOperand, MCE_DeleteConfig, MCE_DeleteConfigOperand, MCE_GetConfigOperand, MCE_GetCurrentConfig, MCE_GetCurrentNumOperands, \
         MCE_GetNumberOfConfigs, MCE_InsertConfig, MCE_InsertConfigOperand, MCE_MakeAllSingleConfig, MCE_SetActiveConfig, MCE_SetOperand, _convert_raw_MCEOper_input_
     from skZemax.skZemax_subfunctions._MFE_functions import MFE_AddNewOperand, MFE_GetNumberOfOperands, MFE_GetOperand, MFE_GetOperandValues, MFE_InsertNewOperand, MFE_SetOperand, _convert_raw_operand_input_
@@ -63,5 +65,4 @@ if __name__ == '__main__':
     # skZemax.Utilities_OpenZemaxFile(skZemax.SamplesDir() + os.sep + r'Non-sequential\Miscellaneous\Digital_projector_flys_eye_homogenizer.zmx', False)
     # skZemax.Utilities_OpenZemaxFile(skZemax.Utilities_skZemaxExampleDir() + os.sep + r'e01_new_file_and_quickfocus.zmx', False)
     skZemax.Utilities_OpenZemaxFile(r'E:\GitReposUSASK\CodeRepos\skzemax_ali\src\skZemax_ALI\ALIv11_20251126\HoneywellSubmittedFile\ALI_3rdOption_No Fold_v11_FinalSpec_bafflevane_20251111PrismTilted.zmx', False)
-    skZemax.Field_GetAllDataOfField(1)
-    skZemax.AnalysisPlotting_Footprint(skZemax.Analyses_Footprint(in_Surface=43))
+    skZemax.LDE_BuildRayTraceRays()
