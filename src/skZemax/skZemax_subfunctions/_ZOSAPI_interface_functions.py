@@ -1,6 +1,9 @@
 import numpy as np
 from typing import Union, Any
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
+import clr, os, winreg, ctypes, sys
+import numpy as np
+from System.Runtime.InteropServices import GCHandle, GCHandleType
 
 def _convert_raw_input_worker_(self, in_value: Union[int, Any], object_type: Any, return_index:bool=True)->Union[int, Any]:
     """
@@ -181,3 +184,27 @@ def _SetAttrByStringIfValid_(self,
     else:
         cp('!@ly!@_SetAttrByStringIfValid_ :: [!@lm!@{}!@ly!@] not found in object [!@lm!@{}!@ly!@].'.format(in_string, str(in_obj)))
         return
+
+@staticmethod
+def _ctype_to_numpy_(self, data:Any, data_length:int, data_type:Any=np.int64)->Any:
+    """
+    This method is a port from the example code attached to the `ZemaxRaytraceSupplement/RayTrace.dll`.
+    This conversion helps interface python with the C# code.
+
+    :param data: A pointer to a double reported by the C# code.
+    :type data: Any
+    :param data_length: The pointer array length to read in.
+    :type data_length: int, optional
+    :param data_type: The type of data to expect from the C# code, defaults to np.int64
+    :type data_type: Any, optional
+    :return: The value(s)
+    :rtype: Any
+    """
+    src_hndl = GCHandle.Alloc(data, GCHandleType.Pinned)
+    try:
+        src_ptr = src_hndl.AddrOfPinnedObject().ToInt64()
+        cbuf = (ctypes.c_double*data_length).from_address(src_ptr)
+        npData = np.frombuffer(cbuf, dtype=data_type)
+    finally:
+        if src_hndl.IsAllocated: src_hndl.Free()
+    return npData

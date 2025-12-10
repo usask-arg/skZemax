@@ -1,8 +1,11 @@
 import numpy as np
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
-from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _convert_raw_input_worker_, __LowLevelZemaxStringCheck__
+from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _convert_raw_input_worker_, __LowLevelZemaxStringCheck__, _CheckIfStringValidInDir_, _ctype_to_numpy_
+from skZemax.skZemax_subfunctions._field_functions import Field_GetNormalization
+from skZemax.skZemax_subfunctions._wavelength_functions import Wavelength_GetNumberOfWavelengths, Wavelength_GetWavelength, _convert_raw_wavelength_input_, ZOSAPI_SystemData_IWavelength
 from typing import Union
 import xarray as xr
+import clr
 
 type ZOSAPI_Editors_LDE_ILDERow                 = object #<- ZOSAPI.Editors.LDE.ILDERow # The actual module is referenced by the base PythonStandaloneApplication class.
 type ZOSAPI_Editors_LDE_ISurfaceApertureType    = object #<- ZOSAPI.Editors.LDE.ISurfaceApertureType # The actual module is referenced by the base PythonStandaloneApplication class.
@@ -32,9 +35,9 @@ def LDE_GetSurface(self, SurfaceNum: int)->ZOSAPI_Editors_LDE_ILDERow:
     """
 
     SurfaceNum = int(SurfaceNum)
-    if SurfaceNum <= self.LDE_GetNumberOfSurfaces() and SurfaceNum >= 0:
+    if SurfaceNum < self.LDE_GetNumberOfSurfaces() and SurfaceNum >= 0:
         return self.TheSystem.LDE.GetSurfaceAt(int(SurfaceNum))
-    if self._verbose: cp('!@ly!@LDE_GetSurface :: Asked for Surface [!@lm!@{}!@ly!@] but there are only !@lm!@{}!@ly!@ surfaces built.'.format(SurfaceNum, self.LDE_GetNumberOfSurfaces()))
+    if self._verbose: cp('!@ly!@LDE_GetSurface :: Asked for Surface [!@lm!@{}!@ly!@] but there are only !@lm!@{}!@ly!@ surfaces built up to index !@lm!@{}!@ly!@.'.format(SurfaceNum, self.LDE_GetNumberOfSurfaces(), self.LDE_GetNumberOfSurfaces()-1))
     return None
 
 def LDE_InsertNewSurface(self, insertSurface: Union[int, ZOSAPI_Editors_LDE_ILDERow])->ZOSAPI_Editors_LDE_ILDERow:
@@ -528,29 +531,182 @@ def LDE_SetTiltDecenterAfterSurfaceMode(self, in_Surface: Union[int, ZOSAPI_Edit
     else:
         cp('!@ly!@LDE_SetTiltDecenterAfterSurfaceMode :: Expected [!@lm!@string!@ly!@] or [!@lm!@tuple!@ly!@] as input. Got [!@lm!@{}!@ly!@].'.format(str(type(mode))))
 
-def LDE_BuildRayTraceRays(self,)->xr.Dataset:
-    out = xr.Dataset(
+def LDE_BuildRayTraceNormalizedUnpolarizedRays(self,
+                                               Hx:np.ndarray=np.linspace(-1, 1, 10), 
+                                               Hy:np.ndarray=np.linspace(-1, 1, 10), 
+                                               Px:np.ndarray=np.linspace(-1, 1, 10),
+                                               Py:np.ndarray=np.linspace(-1, 1, 10),
+                                               ending_surface:Union[int, ZOSAPI_Editors_LDE_ILDERow]=None,
+                                               wavelengths:Union[int, ZOSAPI_SystemData_IWavelength, list[int, ZOSAPI_SystemData_IWavelength], np.ndarray[int, ZOSAPI_SystemData_IWavelength]]=None,
+                                               ray_type:str='Real',
+                                               OPD_mode:str='None',)->xr.Dataset:
+    """
+    This function sets up custom `unpolarized` rays in Zemax's `normalized` coordiante system. 
+    These rays are intended to be used in an skZemax sequential ray trace executed with :func:`LDE_RunRayTrace`. 
+    
+        In this system a single ray is defined by a starting position at the front of the optical system `(Hx, Hy)`,
+        and a point on the entrence pupil to travel through `(Px, Py)`.
+
+    A grid of rays - defined by `Hx` and `Hy` - are built in a normalized coordianate as input to the optical system.
+    There are two normalized systems - set by :func:`Field_SetNormalization`:
+
+    Radial:
+
+        If the field normalization is radial, then the normalized field coordinates represent points on a unit circle. The radius
+        of this unit circle, called the maximum radial field, is given by the radius of the field point farthest from the origin in
+        field coordinates. The maximum radial field magnitude is then used to scale all fields to normalized field coordinates.
+        Real field coordinates can be determined by multiplying the normalized coordinates, `Hx` and `Hy`, by the maximum
+        radial field magnitude:
+
+        :math:`f_x = (Hx)(F_r)`
+
+        :math:`f_y = (Hy)(F_r)`
+
+        where :math:`F_r` is the maximum radial field magnitude and :math:`f_x` and :math:`f_y` are the field coordinates in field units.
+
+    Rectangular:
+
+        If the field normalization is rectangular, then the normalized field coordinates represent points on a unit rectangle.
+        The x and y direction widths of this unit rectangle, called the maximum x field and maximum y field, are defined by
+        the largest absolute magnitudes of all the x and y field coordinates. The maximum x and y field magnitudes are then
+        used to scale all fields to normalized field coordinates. Real field coordinates can be determined by multiplying the
+        normalized coordinates
+
+        :math:`f_x = (Hx)(F_x)`
+
+        :math:`f_y = (Hy)(F_y)`
+
+        where :math:`F_x` and :math:`F_x` are the x and y field magnitudes, and :math:`f_x` and :math:`f_y` are the field coordinates in field units.
+
+    This function builds rays such that each - and every - ray defined in the `(Hx, Hy) grid` at the front is then traced through a positon of the 
+    entrance pupil defined also by a normalized system `(Px, Py)`. Unlike the `(Hx, Hy)` coordiantes, the entrnce pupil is always treated as radial:
+
+        The normalized pupil coordinate (0.0, 1.0) is always at the top of the pupil, and therefore defines a marginal ray. 
+        The normalized pupil coordinate (0.0, 0.0) always goes through the center of the pupil, and therefore defines a chief ray.
+        The radial size of the pupil is defined by the radius of the paraxial entrance pupil, unless ray aiming is turned on, 
+        in which case the radial size of the pupil is given by the radial size of the stop. 
+
+    This function will build rays for you in this system, based on the inputs of the `(Hx, Hy)` and `(Px, Py)` grids. 
+    In building both grids the radial constraints (if applicable) are handled for you and any input with a magnitude greater than 1 are filtered. 
+
+    A Final note on calulation of optical path difference (`OPD_mode`) - which can only be calculated when tracing rays all the way to the image surface:
+
+        Computing the OPD takes additional time beyond that for regular ray tracing, and OpticStudio only performs this
+        additional computation if requested to do so. Computing the OPD is also more complicated for the client program,
+        which means two rays must be traced rather than just one. To compute OPD for an arbitrary ray, OpticStudio must trace the chief ray, 
+        then the arbitrary ray, then subtract the phase of the two to get the OPD. 
+        Rather than trace the same chief ray over and over, which is slow, usually the chief ray is traced
+        once, and then the phase of the chief ray is subtracted from each subsequent ray.
+
+        `None`: no OPD calculation will be performed. It will return the optical path as defined in the Single Ray Trace analysis. 
+        That value can differ from other analyses at infinite conjugates.
+
+        `Current`: calculate the OPD based on the current ray and the previously computed chief ray.
+
+        `CurrentAndChief`: will first compute the chief ray, and then calculate the OPD for the current ray. 
+
+    If `Current` is suppiled, then :func:`LDE_RunRayTrace` will use `CurrentAndChief` only on the first ray in a new set of `(Hx, Hy)` and/or the wavelength changes.
+
+    :param Hx: An array of Hx points, defaults to np.linspace(-1, 1, 10)
+    :type Hx: np.ndarray, optional
+    :param Hy: An array of Hy points, defaults to np.linspace(-1, 1, 10)
+    :type Hy: np.ndarray, optional
+    :param Px: An array of Px points, defaults to np.linspace(-1, 1, 10)
+    :type Px: np.ndarray, optional
+    :param Py: An array of Py points, defaults to np.linspace(-1, 1, 10)
+    :type Py: np.ndarray, optional
+    :param ending_surface: The surface to trace the rays up to (object or as an index), defaults to None (takes the last surface)
+    :type ending_surface: Union[int, ZOSAPI_Editors_LDE_ILDERow], optional
+    :param wavelengths: Wavelength(s) of the system to trace (object or as an index), defaults to None (takes all currently configured wavelengths)
+    :type wavelengths: Union[int, ZOSAPI_SystemData_IWavelength, list[int, ZOSAPI_SystemData_IWavelength], np.ndarray[int, ZOSAPI_SystemData_IWavelength]], optional
+    :param ray_type: Type of ray tracing to do. Options are "Real" or "Paraxial". "Paraxial" applies small angle approximations to snell's law for speed where "Real" does not, defaults to "Real"
+    :type ray_type: str, optional
+    :param OPD_mode: The type of OPD scheme to apply (see desciprtion above), defaults to 'None'
+    :type OPD_mode: str, optional
+    :return: An xarray of rays ready to be traced by :func:`LDE_RunRayTrace`
+    :rtype: xr.Dataset
+    """
+    if ending_surface is None:
+        ending_surface = self.LDE_GetNumberOfSurfaces()-1
+    else:
+        ending_surface = self._convert_raw_surface_input_(ending_surface, return_index=True)
+    if wavelengths is None:
+        wavelengths_idx = np.arange(1, self.Wavelength_GetNumberOfWavelengths()+1, 1)
+    elif not isinstance(wavelengths, np.ndarray) and not isinstance(wavelengths, list):
+        wavelengths = np.array([wavelengths])
+    wavelengths_idx = np.array([_convert_raw_wavelength_input_(self, x, return_index=True) for x in wavelengths])
+    wavelengths_um  = np.array([self.Wavelength_GetWavelength(x).Wavelength for x in wavelengths_idx])
+    HX, HY    = np.meshgrid(Hx, Hy)
+    HX        = HX[np.abs(HX) <=1]
+    HY        = HY[np.abs(HY) <=1]
+    if 'Rect' not in Field_GetNormalization(self):
+        radius    = HX**2 + HY**2
+        HX        = HX[radius <= 1]
+        HY        = HY[radius <= 1]
+    # Normazlied pupil is always radial
+    PX, PY    = np.meshgrid(Px, Py)
+    PX        = PX[np.abs(PX) <=1]
+    PY        = PY[np.abs(PY) <=1]
+    radius    = PX**2 + PY**2
+    PX        = PX[radius <= 1]
+    PY        = PY[radius <= 1]
+    return xr.Dataset(
         {
-                'x_min'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
-                'x_max'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
-                'y_min'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
-                'y_max'               : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
-                'rad_max'             : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
-                'x_cntr'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
-                'y_cntr'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
-                'x_half'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
-                'y_half'              : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
-                'wavelength_um'       : (('conf', 'wvln', 'fld'), np.copy(blank_array)),
+            'wavelengths_um'   : ('wvln', wavelengths_um.astype(float)),
+            'Hx'               : ('ray_num', np.repeat(HX, PX.shape[0]).astype(float)),
+            'Hy'               : ('ray_num', np.repeat(HY, PX.shape[0]).astype(float)),
+            'Px'               : ('ray_num', np.tile(PX, HX.shape[0]).astype(float)),
+            'Py'               : ('ray_num', np.tile(PY, HX.shape[0]).astype(float)),
         },
         coords =
         {
-                "configuration_index" : ('conf', np.array(np.arange(1, self.MCE_GetNumberOfConfigs()+1, 1))),
-                "wavelength_index"    : ('wvln', np.array(np.arange(1, self.Wavelength_GetNumberOfWavelengths()+1, 1))),
-                "field_index"         : ('fld', np.array(np.arange(1, self.Fields_GetNumberOfFields()+1, 1))),
+            "wavelengths_idx"   : ('wvln', wavelengths_idx.astype(int))
+        },
+        attrs={
+            'ray_trace_type' : 'NormUnpol',
+            'ending_surface' : str(int(ending_surface)),
+            'ray_type'       : str(_CheckIfStringValidInDir_(self, self.ZOSAPI.Tools.RayTrace.RaysType, ray_type)),
+            'OPD_mode'       : str(_CheckIfStringValidInDir_(self, self.ZOSAPI.Tools.RayTrace.OPDMode, OPD_mode))
         })
+    
 
 
-# def LDE_RunRayTrace(self):
-#     # ZOSAPI.Tools.RayTrace.IBatchRayTrace.GetDirectFieldCoordinates  ( 
-#     raytrace = self.TheSystem.Tools.OpenBatchRayTrace()
-#     raytrace.CreateDirectUnpol(total_rays_in_both_axes, ZOSAPI.Tools.RayTrace.RaysType.Real, startSurface, toSurface);
+def LDE_RunRayTrace(self, ray_trace_rays:xr.Dataset=None, ray_read_chunk:int=None):
+    if ray_trace_rays is None:
+        ray_trace_rays = self.LDE_BuildRayTraceNormalizedUnpolarizedRays()
+    opened_batch_ray_trace = self.TheSystem.Tools.OpenBatchRayTrace()
+    desired_ray_trace_call = _CheckIfStringValidInDir_(self, opened_batch_ray_trace, ray_trace_rays.attrs['ray_trace_type'], extra_include_filter=['Create'], extra_exclude_filter=['NSC'])
+    if 'CreateNormUnpol' in str(desired_ray_trace_call):
+        ray_tracer = desired_ray_trace_call(ray_trace_rays.ray_num.shape[0], _CheckIfStringValidInDir_(self, self.ZOSAPI.Tools.RayTrace.RaysType, ray_trace_rays.attrs['ray_type']), int(ray_trace_rays.attrs['ending_surface']))
+        dataReader = self.BatchRayTrace.ReadNormUnpolData(opened_batch_ray_trace, ray_tracer)
+        
+    dataReader.ClearData()
+    if ray_read_chunk is None or ray_read_chunk > ray_trace_rays.ray_num.shape[0]:
+        ray_read_chunk = ray_trace_rays.ray_num.shape[0]
+
+    for wvidx in range(1, self.Wavelength_GetNumberOfWavelengths()+1, 1):
+        dataReader.AddRay(wvidx, 
+                          ray_trace_rays.Hx.values, ray_trace_rays.Hy.values, 
+                          ray_trace_rays.Px.values, ray_trace_rays.Py.values, 
+                          _CheckIfStringValidInDir_(self, self.ZOSAPI.Tools.RayTrace.OPDMode, ray_trace_rays.attrs['OPD_mode']))
+    rayData       = dataReader.InitializeOutput(ray_read_chunk)
+    isFinished    = False
+    totalSegRead = 0
+    while isFinished == False and rayData is not None:
+        readSegments = dataReader.ReadNextBlock(rayData)
+        if readSegments == 0:
+            isFinished = True
+        else:
+            totalSegRead = totalSegRead + readSegments
+            totalRaysRead = np.max(_ctype_to_numpy_(self, rayData.rayNumber, data_length=int(np.floor(readSegments/2)), data_type=np.long))
+
+
+
+# raytrace = TheSystem.Tools.OpenBatchRayTrace();
+# % GetDirectFieldCoordinates
+# % Result is the Boolean output, "X, Y, Z, L, M, N" are the "out double" variables as defined in the syntax guide
+# [result,X,Y,Z,L,M,N] = raytrace.GetDirectFieldCoordinates(wavenumber, ZOSAPI.Tools.RayTrace.RaysType.Real, hx, hy, px, py);
+# % GetPhase 
+# % Result is the Boolean output, "exr, exi, eyr, eyi, ezr, ezi" are the "out double" variables as defined in the syntax guide 
+# [exr,exi,eyr,eyi,ezr,ezi] = raytrace.GetPhase(L, M, N, jx, jy, xPhaseDeg, yPhaseDeg, intensity); 
+# raytrace.Close();

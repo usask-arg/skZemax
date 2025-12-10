@@ -145,13 +145,15 @@ def Field_SetNormalization(self, normalization:str='Radial')->None:
     """
     Sets the type of field normalization to apply.
     This is relevant for specifying rays in normalized normalized x-field coordinate `Hx` and normalized y-field coordinate `Hy`.
+
+    See :func:`LDE_BuildRayTraceNormalizedUnpolarizedRays` for a more in-depth description.
      
     Options are:
 
     - Radial
         `Hx^2 + Hy^2 <= 1`
     - Rectangular
-        `Hx <= 1` and `Hy <= 1`
+        `abs(Hx) <= 1` and `abs(Hy) <= 1`
 
     :param normalization: Type of normalization to apply when specifying ray coordinates `Hx` and `Hy`, defaults to 'Radial'
     :type normalization: str, optional
