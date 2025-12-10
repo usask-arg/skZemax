@@ -671,7 +671,25 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(self,
     
 
 
-def LDE_RunRayTrace(self, ray_trace_rays:xr.Dataset=None, ray_read_chunk:int=None):
+def LDE_RunRayTrace(self, ray_trace_rays:xr.Dataset=None, ray_read_chunk:int=1000):
+    """
+    This funcion executes a sequential ray trace.
+    There are differnt definitions for a seqeutnal ray trace:
+
+        - Normalized Unpolarized (NormUnpol)
+        - Direct Unpolarized (DirectUnpol)
+        - Normalized Polarized (NormPol)
+        - Direct Polarized (DirectPol)
+
+    The normalized/direct distinction consdiersdsda 
+    
+    according to settings/values given in an xarray.
+
+    :param ray_trace_rays: _description_, defaults to None
+    :type ray_trace_rays: xr.Dataset, optional
+    :param ray_read_chunk: _description_, defaults to 1000
+    :type ray_read_chunk: int, optional
+    """
     if ray_trace_rays is None:
         ray_trace_rays = self.LDE_BuildRayTraceNormalizedUnpolarizedRays()
     opened_batch_ray_trace = self.TheSystem.Tools.OpenBatchRayTrace()
