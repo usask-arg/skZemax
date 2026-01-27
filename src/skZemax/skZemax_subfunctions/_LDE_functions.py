@@ -748,7 +748,7 @@ def _run_NormUnPol_raytrace_(self, opened_batch_ray_trace:ZOSAPI_Tools_RayTrace_
     if not bool(int(ray_trace_rays.attrs['trace_wavelengths_individually'])):
         # We are not looking at each wavelength by itself.
         for surf_idx, surf in enumerate(surfaces_to_trace):
-            ray_tracer = desired_ray_trace_call(ray_trace_rays.ray.shape[0], _CheckIfStringValidInDir_(self, self.ZOSAPI.Tools.RayTrace.RaysType, ray_trace_rays.attrs['ray_type']), int(surf_idx))
+            ray_tracer = desired_ray_trace_call(ray_trace_rays.ray.shape[0], _CheckIfStringValidInDir_(self, self.ZOSAPI.Tools.RayTrace.RaysType, ray_trace_rays.attrs['ray_type']), int(surf))
             dataReader = self.BatchRayTrace.ReadNormUnpolData(opened_batch_ray_trace, ray_tracer)
             dataReader.ClearData()
             for wvlenidx in ray_trace_rays.wavelengths_idx.values:
@@ -788,7 +788,7 @@ def _run_NormUnPol_raytrace_(self, opened_batch_ray_trace:ZOSAPI_Tools_RayTrace_
         # Do each wavelength by itself. Each will now have it's own index.
         for wi, wvlenidx in enumerate(ray_trace_rays.wavelengths_idx.values):
             for surf_idx, surf in enumerate(surfaces_to_trace):
-                ray_tracer = desired_ray_trace_call(ray_trace_rays.ray.shape[0], _CheckIfStringValidInDir_(self, self.ZOSAPI.Tools.RayTrace.RaysType, ray_trace_rays.attrs['ray_type']), int(surf_idx))
+                ray_tracer = desired_ray_trace_call(ray_trace_rays.ray.shape[0], _CheckIfStringValidInDir_(self, self.ZOSAPI.Tools.RayTrace.RaysType, ray_trace_rays.attrs['ray_type']), int(surf))
                 dataReader = self.BatchRayTrace.ReadNormUnpolData(opened_batch_ray_trace, ray_tracer)
                 dataReader.ClearData()
                 dataReader.AddRay(int(wvlenidx), 

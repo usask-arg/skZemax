@@ -70,7 +70,9 @@ if __name__ == '__main__':
     #                                                                                           Hy=np.array([0]),
     #                                                                                             Px=np.array([0]),
     #                                                                                               Py=np.array([1]), wavelengths=None))
-    skZemax.Field_ClearVignettingFactors()
-    ray_trace = skZemax.LDE_RunRayTrace()
+    ray_trace = skZemax.LDE_RunRayTrace(skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(Hx=np.array([0]), 
+                                               Hy=np.array([0]), 
+                                               Px=np.cos(np.linspace(0, 2 * np.pi, 150, endpoint=False)),
+                                               Py=np.sin(np.linspace(0, 2 * np.pi, 150, endpoint=False)), do_all_surfaces_to_ending=False))
     ray_trace.sel(surf=43).reset_coords('wavelengths_idx', drop=True).plot.scatter(x="X", y='Y')
     a = 1
