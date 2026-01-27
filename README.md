@@ -1,4 +1,4 @@
-# SkZemax
+# SkZemax - Still In Development 
 
 [![Anaconda-Server Badge](https://anaconda.org/usask-arg/usask_arg_example/badges/version.svg)](https://anaconda.org/usask-arg/usask_arg_example)
 [![Documentation Status](https://readthedocs.org/projects/usask_arg_example/badge/?version=latest)](https://usask_arg_example.readthedocs.io/en/latest/?badge=latest)
