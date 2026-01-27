@@ -70,5 +70,7 @@ if __name__ == '__main__':
     #                                                                                           Hy=np.array([0]),
     #                                                                                             Px=np.array([0]),
     #                                                                                               Py=np.array([1]), wavelengths=None))
+    skZemax.Field_ClearVignettingFactors()
     ray_trace = skZemax.LDE_RunRayTrace()
+    ray_trace.sel(surf=43).reset_coords('wavelengths_idx', drop=True).plot.scatter(x="X", y='Y')
     a = 1
