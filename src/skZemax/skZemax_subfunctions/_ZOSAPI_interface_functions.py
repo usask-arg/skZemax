@@ -202,8 +202,12 @@ def _ctype_to_numpy_(self, data:Any, data_length:int, data_type:Any=np.int64)->A
     """
     src_hndl = GCHandle.Alloc(data, GCHandleType.Pinned)
     try:
+        size_factor = ctypes.sizeof(ctypes.c_int32)/np.dtype(data_type).itemsize
         src_ptr = src_hndl.AddrOfPinnedObject().ToInt64()
-        cbuf = (ctypes.c_double*data_length).from_address(src_ptr)
+        if size_factor >= 1:
+            cbuf = (ctypes.c_int32*int(data_length*size_factor)).from_address(src_ptr)
+        else:
+            cbuf = (ctypes.c_int32*int(data_length/size_factor)).from_address(src_ptr)
         npData = np.frombuffer(cbuf, dtype=data_type)
     finally:
         if src_hndl.IsAllocated: src_hndl.Free()

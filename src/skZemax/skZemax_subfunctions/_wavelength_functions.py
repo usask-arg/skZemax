@@ -92,3 +92,26 @@ def Wavelength_AddWavelength(self, wavelength_micrometers:float, wavelength_weig
     :rtype: ZOSAPI_SystemData_IWavelength
     """
     return self.TheSystem.SystemData.Wavelengths.AddWavelength(float(wavelength_micrometers), float(wavelength_weight))
+
+def Wavelength_SetPrimaryWavelength(self, in_wavelength:Union[int, ZOSAPI_SystemData_IWavelength])->ZOSAPI_SystemData_IWavelength:
+    """
+    Sets the wavelength as the primary one in the system
+
+    :param in_wavelength: The wavelength to make primary - either an index or the wavelength object.
+    :type in_wavelength: Union[int, ZOSAPI_SystemData_IWavelength]
+    :return: The primary wavelength object.
+    :rtype: ZOSAPI_SystemData_IWavelength
+    """
+    wavelength_object = self._convert_raw_wavelength_input_(in_wavelength, return_index=False)
+    wavelength_object.MakePrimary()
+    return wavelength_object
+
+def Wavelength_GetPrimaryWavelength(self)->ZOSAPI_SystemData_IWavelength:
+    """
+    Returns the wavelength which is the primary one in the system
+
+    :return: The primary wavelength object.
+    :rtype: ZOSAPI_SystemData_IWavelength
+    """
+    bool_primary = [self._convert_raw_wavelength_input_(x, return_index=False).IsPrimary for x in range(1, self.Wavelength_GetNumberOfWavelengths()+1, 1)]
+    return self._convert_raw_wavelength_input_(np.argmax(bool_primary) + 1, return_index=False)

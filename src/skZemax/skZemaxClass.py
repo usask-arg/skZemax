@@ -2,6 +2,7 @@ from __future__ import annotations
 from skZemax.skZemax_subfunctions._app import PythonStandaloneApplication
 import clr
 import inspect
+import os
 
 class skZemaxClass(PythonStandaloneApplication):
     def __init__(self, path=None, verbose:bool=True):
@@ -36,7 +37,7 @@ class skZemaxClass(PythonStandaloneApplication):
         LDE_ChangeApertureToRectangular, LDE_ChangeSurfaceType, LDE_CheckIfSurfaceIsStop, LDE_CopyAndInsertSurfacesFromFile, LDE_GetAllColumnDataOfSurface, LDE_GetApertureTypeSettings,  \
             LDE_GetNamesOfAllApertureTypes, LDE_GetNamesOfAllSurfaceTypes, LDE_GetNumberOfSurfaces, LDE_GetSurface, LDE_GetSurfaceColumnEnum, LDE_InsertNewSurface, LDE_RemoveSurface, \
                 LDE_SetAllColumnDataOfSurfaceFromDict, LDE_SetSurfaceAsStop, LDE_SetTiltDecenterAfterSurfaceMode, LDE_SetTiltDecenterOfSurface, _LDE_GetSurfaceCalls_, _LDE_GetSurfaceColumns_, \
-                    _convert_raw_surface_input_, LDE_RunRayTrace, LDE_BuildRayTraceNormalizedUnpolarizedRays
+                    _convert_raw_surface_input_, LDE_RunRayTrace, LDE_BuildRayTraceNormalizedUnpolarizedRays, _run_NormUnPol_raytrace_
     from skZemax.skZemax_subfunctions._MCE_functions import MCE_AddConfig, MCE_AddConfigOperand, MCE_DeleteConfig, MCE_DeleteConfigOperand, MCE_GetConfigOperand, MCE_GetCurrentConfig, MCE_GetCurrentNumOperands, \
         MCE_GetNumberOfConfigs, MCE_InsertConfig, MCE_InsertConfigOperand, MCE_MakeAllSingleConfig, MCE_SetActiveConfig, MCE_SetOperand, _convert_raw_MCEOper_input_
     from skZemax.skZemax_subfunctions._MFE_functions import MFE_AddNewOperand, MFE_GetNumberOfOperands, MFE_GetOperand, MFE_GetOperandValues, MFE_InsertNewOperand, MFE_SetOperand, _convert_raw_operand_input_
@@ -57,12 +58,17 @@ class skZemaxClass(PythonStandaloneApplication):
     from skZemax.skZemax_subfunctions._visualization_functions import Visualization_NSC_3DViewer, Visualization_NSC_ShadedModel, Visualization_SEQ_2DCrossSection, Visualization_SEQ_3DViewer, \
         Visualization_SEQ_ShadedModel, _Visualization_NSC_Common_, _Visualization_SEQ_Common_
     from skZemax.skZemax_subfunctions._wavelength_functions import Wavelength_SelectWavelengthPreset, Wavelength_AddWavelength, Wavelength_GetNamesOfAllPresets, Wavelength_GetNumberOfWavelengths, \
-        Wavelength_GetWavelength, Wavelength_RemoveWavelength, _convert_raw_wavelength_input_
+        Wavelength_GetWavelength, Wavelength_RemoveWavelength, Wavelength_SetPrimaryWavelength, Wavelength_GetPrimaryWavelength, _convert_raw_wavelength_input_
     
-if __name__ == '__main__':
-    import os
+if __name__ == '__main__':    
+    import numpy as np
     skZemax = skZemaxClass()
     # skZemax.Utilities_OpenZemaxFile(skZemax.SamplesDir() + os.sep + r'Non-sequential\Miscellaneous\Digital_projector_flys_eye_homogenizer.zmx', False)
     # skZemax.Utilities_OpenZemaxFile(skZemax.Utilities_skZemaxExampleDir() + os.sep + r'e01_new_file_and_quickfocus.zmx', False)
     skZemax.Utilities_OpenZemaxFile(r'E:\_OfficerRepositories\ZemaxRepos\skzemax_ali\src\skZemax_ALI\ALIv11_20251126\HoneywellSubmittedFile\ALI_3rdOption_No Fold_v11_FinalSpec_bafflevane_20251111PrismTilted.zmx', False)
-    skZemax.LDE_RunRayTrace()
+    # ray_trace = skZemax.LDE_RunRayTrace(ray_trace_rays=skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(Hx=np.array([0]), 
+    #                                                                                           Hy=np.array([0]),
+    #                                                                                             Px=np.array([0]),
+    #                                                                                               Py=np.array([1]), wavelengths=None))
+    ray_trace = skZemax.LDE_RunRayTrace()
+    a = 1
