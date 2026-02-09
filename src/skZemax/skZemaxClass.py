@@ -33,9 +33,9 @@ class skZemaxClass(PythonStandaloneApplication):
     from skZemax.skZemax_subfunctions._CAD_functions import CAD_ExportSequentialCadSTPFileAs
     from skZemax.skZemax_subfunctions._field_functions import _convert_raw_field_input_, Field_DeleteField, Field_GetField, Fields_AddField, Fields_GetNumberOfFields, Field_SetAllDataOfFieldFromDict, \
         Field_GetAllDataOfField, Field_SetFieldType, Field_GetFieldType, Field_ClearVignettingFactors, Field_SetVignettingFactors, Field_GetNormalization, Field_SetNormalization
-    from skZemax.skZemax_subfunctions._LDE_functions import LDE_AddNewSurface, LDE_ChangeApertureToCircular, LDE_ChangeApertureToCircularObscuration, LDE_ChangeApertureToFloating, \
-        LDE_ChangeApertureToRectangular, LDE_ChangeSurfaceType, LDE_CheckIfSurfaceIsStop, LDE_CopyAndInsertSurfacesFromFile, LDE_GetAllColumnDataOfSurface, LDE_GetApertureTypeSettings,  \
-            LDE_GetNamesOfAllApertureTypes, LDE_GetNamesOfAllSurfaceTypes, LDE_GetNumberOfSurfaces, LDE_GetSurface, LDE_GetSurfaceColumnEnum, LDE_InsertNewSurface, LDE_RemoveSurface, \
+    from skZemax.skZemax_subfunctions._LDE_functions import LDE_AddNewSurface, LDE_ChangeApertureToCircular, LDE_GetApertureAsCircularType, LDE_ChangeApertureToCircularObscuration, LDE_GetApertureAsCircularObscurationType, LDE_ChangeApertureToFloating, \
+        LDE_ChangeApertureToRectangular, LDE_GetApertureAsRectangularType, LDE_ChangeSurfaceType, LDE_GetStopSurface, LDE_CheckIfSurfaceIsStop, LDE_CopyAndInsertSurfacesFromFile, LDE_GetAllColumnDataOfSurface, \
+            LDE_GetSurfaceApertureType, LDE_GetApertureTypeSettings, LDE_GetNamesOfAllApertureTypes, LDE_GetNamesOfAllSurfaceTypes, LDE_GetNumberOfSurfaces, LDE_GetSurface, LDE_GetSurfaceColumnEnum, LDE_InsertNewSurface, LDE_RemoveSurface, \
                 LDE_SetAllColumnDataOfSurfaceFromDict, LDE_SetSurfaceAsStop, LDE_SetTiltDecenterAfterSurfaceMode, LDE_SetTiltDecenterOfSurface, _LDE_GetSurfaceCalls_, _LDE_GetSurfaceColumns_, \
                     _convert_raw_surface_input_, LDE_RunRayTrace, LDE_BuildRayTraceNormalizedUnpolarizedRays, _run_NormUnPol_raytrace_
     from skZemax.skZemax_subfunctions._MCE_functions import MCE_AddConfig, MCE_AddConfigOperand, MCE_DeleteConfig, MCE_DeleteConfigOperand, MCE_GetConfigOperand, MCE_GetCurrentConfig, MCE_GetCurrentNumOperands, \

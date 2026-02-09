@@ -7,11 +7,11 @@ from typing import Union
 import xarray as xr
 import clr
 
-type ZOSAPI_Editors_LDE_ILDERow                 = object #<- ZOSAPI.Editors.LDE.ILDERow # The actual module is referenced by the base PythonStandaloneApplication class.
-type ZOSAPI_Editors_LDE_ISurfaceApertureType    = object #<- ZOSAPI.Editors.LDE.ISurfaceApertureType # The actual module is referenced by the base PythonStandaloneApplication class.
-type ZOSAPI_Editors_LDE_SurfaceColumn           = object #<- ZOSAPI.Editors.LDE.SurfaceColumn # The actual module is referenced by the base PythonStandaloneApplication class.
-type ZOSAPI_Tools_RayTrace_IBatchRayTrace       = object #<- ZOSAPI.Tools.RayTrace.IBatchRayTrace # The actual module is referenced by the base PythonStandaloneApplication class.
-type CLR_MethodBinding                          = object #<- CLR.MethodBinding # The actual module is referenced by the base PythonStandaloneApplication class.
+type ZOSAPI_Editors_LDE_ILDERow                       = object #<- ZOSAPI.Editors.LDE.ILDERow # The actual module is referenced by the base PythonStandaloneApplication class.
+type ZOSAPI_Editors_LDE_ISurfaceApertureType          = object #<- ZOSAPI.Editors.LDE.ISurfaceApertureType # The actual module is referenced by the base PythonStandaloneApplication class.
+type ZOSAPI_Editors_LDE_SurfaceColumn                 = object #<- ZOSAPI.Editors.LDE.SurfaceColumn # The actual module is referenced by the base PythonStandaloneApplication class.
+type ZOSAPI_Tools_RayTrace_IBatchRayTrace             = object #<- ZOSAPI.Tools.RayTrace.IBatchRayTrace # The actual module is referenced by the base PythonStandaloneApplication class.
+type CLR_MethodBinding                                = object #<- CLR.MethodBinding # The actual module is referenced by the base PythonStandaloneApplication class.
 
 def _convert_raw_surface_input_(self, in_surface: Union[int, ZOSAPI_Editors_LDE_ILDERow], return_index:bool=True)->Union[int, ZOSAPI_Editors_LDE_ILDERow]:
     return _convert_raw_input_worker_(self, in_value=in_surface, object_type=self.ZOSAPI.Editors.LDE.ILDERow, return_index=return_index)
@@ -149,13 +149,24 @@ def LDE_GetNamesOfAllApertureTypes(self, print_to_console:bool=False)->list:
         cp('\n')
     return aperture_types
 
+def LDE_GetSurfaceApertureType(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow])->str:
+    """
+    This function returns the type of aperture the given surface is.
+
+    :param in_Surface: The surface to change as an object or as an index.
+    :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
+    :return: The name of the aperture type
+    :rtype: str
+    """
+    return str(self._convert_raw_surface_input_(in_Surface, return_index=False).ApertureData.CurrentType)
+
 def LDE_GetApertureTypeSettings(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow], aperture_type: str)->ZOSAPI_Editors_LDE_ISurfaceApertureType:
     """
-    Gets the aperture type settings to change a LDE surface's aperture.
-    
     Note that while this is available to a user for customized implantation, it is recommended to go through a pre-defined function like
-    :func:`LDE_ChangeApertureToRectangular` or :func:`LDE_ChangeApertureToCircular` to change the aperture.
-
+    :func:`LDE_ChangeApertureToRectangular`/:func:`LDE_GetApertureAsRectangularType` or :func:`LDE_ChangeApertureToCircular`/:func:`LDE_GetApertureAsCircularType` to change/get the aperture settings.
+    
+    This function gets the aperture type settings of the surface. Generally this is to change a LDE surface's aperture. 
+    If you want to get the aperture type of the surface use :func:`LDE_GetSurfaceApertureType`.
 
     :param in_Surface: The surface to change as an object or as an index.
     :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
@@ -202,6 +213,26 @@ def LDE_ChangeApertureToRectangular(self, in_Surface: Union[int, ZOSAPI_Editors_
     SurfaceLDE.ApertureData.ChangeApertureTypeSettings(settings)
     return SurfaceLDE
 
+def LDE_GetApertureAsRectangularType(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow])->dict:
+    """
+    This function returns the aperture settings of this object interpreted as a Rectangular aperture by Zemax.
+    Note that this does not nesscarly mean the aperture is currently set to be Rectangular, but rather these are the current settings it would have if it were.
+    If the surface is this type of aperture, then these are the settings it has.
+
+    :param in_Surface: The surface to change as an object or as an index.
+    :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
+    :return: A dict of the Rectangular aperture settings
+    :rtype: dict
+    """
+    SurfaceLDE    = self._convert_raw_surface_input_(in_Surface, return_index=False)
+    settings      = self.LDE_GetApertureTypeSettings(in_Surface=SurfaceLDE, aperture_type='RectangularAperture')
+    out = dict()
+    out['XHalfWidth']           = settings._S_RectangularAperture.XHalfWidth
+    out['YHalfWidth']           = settings._S_RectangularAperture.YHalfWidth
+    out['ApertureXDecenter']    = settings._S_RectangularAperture.ApertureXDecenter
+    out['ApertureYDecenter']    = settings._S_RectangularAperture.ApertureYDecenter
+    return out
+
 def LDE_ChangeApertureToCircular(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow], MinimumRadius:float=0.0, MaximumRadius:float=10.0, ApertureXDecenter:float=0.0, ApertureYDecenter:float=0.0)->ZOSAPI_Editors_LDE_ILDERow:
     """
     Changes the aperture of the surface to a circular one with specified radii.
@@ -232,6 +263,26 @@ def LDE_ChangeApertureToCircular(self, in_Surface: Union[int, ZOSAPI_Editors_LDE
     SurfaceLDE.ApertureData.ChangeApertureTypeSettings(settings)
     return SurfaceLDE
 
+def LDE_GetApertureAsCircularType(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow])->dict:
+    """
+    This function returns the aperture settings of this object interpreted as a Circular aperture by Zemax.
+    Note that this does not nesscarly mean the aperture is currently set to be Circular, but rather these are the current settings it would have if it were.
+    If the surface is this type of aperture, then these are the settings it has.
+
+    :param in_Surface: The surface to change as an object or as an index.
+    :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
+    :return: A dict of the Circular aperture settings
+    :rtype: dict
+    """
+    SurfaceLDE    = self._convert_raw_surface_input_(in_Surface, return_index=False)
+    settings      = self.LDE_GetApertureTypeSettings(in_Surface=SurfaceLDE, aperture_type='CircularAperture')
+    out = dict()
+    out['MinimumRadius']           = settings._S_CircularAperture.MinimumRadius
+    out['MaximumRadius']           = settings._S_CircularAperture.MaximumRadius
+    out['ApertureXDecenter']       = settings._S_CircularAperture.ApertureXDecenter
+    out['ApertureYDecenter']       = settings._S_CircularAperture.ApertureYDecenter
+    return out
+
 def LDE_ChangeApertureToCircularObscuration(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow], MinimumRadius:float=0.0, MaximumRadius:float=10.0, ApertureXDecenter:float=0.0, ApertureYDecenter:float=0.0)->ZOSAPI_Editors_LDE_ILDERow:
     """
     Changes the aperture of the surface to a circular *obscuration* one with specified radii.
@@ -261,6 +312,26 @@ def LDE_ChangeApertureToCircularObscuration(self, in_Surface: Union[int, ZOSAPI_
     settings._S_CircularObscuration.ApertureYDecenter   = ApertureYDecenter
     SurfaceLDE.ApertureData.ChangeApertureTypeSettings(settings)
     return SurfaceLDE
+
+def LDE_GetApertureAsCircularObscurationType(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow])->dict:
+    """
+    This function returns the aperture settings of this object interpreted as a CircularObscuration aperture by Zemax.
+    Note that this does not nesscarly mean the aperture is currently set to be CircularObscuration, but rather these are the current settings it would have if it were.
+    If the surface is this type of aperture, then these are the settings it has.
+
+    :param in_Surface: The surface to change as an object or as an index.
+    :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
+    :return: A dict of the CircularObscuration aperture settings
+    :rtype: dict
+    """
+    SurfaceLDE    = self._convert_raw_surface_input_(in_Surface, return_index=False)
+    settings      = self.LDE_GetApertureTypeSettings(in_Surface=SurfaceLDE, aperture_type='CircularObscuration')
+    out = dict()
+    out['MinimumRadius']           = settings._S_CircularObscuration.MinimumRadius
+    out['MaximumRadius']           = settings._S_CircularObscuration.MaximumRadius
+    out['ApertureXDecenter']       = settings._S_CircularObscuration.ApertureXDecenter
+    out['ApertureYDecenter']       = settings._S_CircularObscuration.ApertureYDecenter
+    return out
 
 def LDE_ChangeApertureToFloating(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow])->ZOSAPI_Editors_LDE_ILDERow:
     """
@@ -293,6 +364,15 @@ def LDE_SetSurfaceAsStop(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow
     """
     in_Surface = self._convert_raw_surface_input_(in_Surface, return_index=False)
     in_Surface.IsStop = True
+
+def LDE_GetStopSurface(self)->ZOSAPI_Editors_LDE_ILDERow:
+    """
+    Finds and returns the stop surface of the system
+
+    :return: The surface object of the stop.
+    :rtype: ZOSAPI_Editors_LDE_ILDERow
+    """
+    return self.LDE_GetSurface(int(np.argmax([self.LDE_CheckIfSurfaceIsStop(x) for x in range(self.LDE_GetNumberOfSurfaces())])))
 
 def LDE_CheckIfSurfaceIsStop(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow])->bool:
     """
