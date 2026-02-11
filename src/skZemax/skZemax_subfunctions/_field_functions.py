@@ -82,14 +82,12 @@ def Field_SetAllDataOfFieldFromDict(self, in_field: Union[int, ZOSAPI_SystemData
     :type in_field: Union[int, ZOSAPI_SystemData_IField]
     :param Field_dict: dict of Field properties to set (i.e. :func:`Field_GetDataOfField`)
     :type Field_dict: dict
-    :return: _description_
-    :rtype: dict
     """
     field_obj = self._convert_raw_field_input_(in_field, return_index=False)
     for key in Field_dict.keys():
         _SetAttrByStringIfValid_(self, field_obj, key, Field_dict[key], extra_exclude_filter=['get', 'Get', 'set', 'Set', 'Solve', 'solve'])
 
-def Field_SetFieldType(self, field_type:str='Angle'):
+def Field_SetFieldType(self, field_type:str='Angle')->None:
     """
     Sets the system field type to one of the following options:
 
@@ -110,7 +108,7 @@ def Field_SetFieldType(self, field_type:str='Angle'):
             If the field definition is Theodolite Angle in the Field Data Editor, the X/Y Field Width indicates the Azimuth/Elevation
             angle in degrees, respectively.
 
-    :param field_type: _description_, defaults to 'Angle'
+    :param field_type: Name of the field type, defaults to 'Angle'
     :type field_type: str, optional
     """
     self.TheSystem.SystemData.Fields.ConvertToFieldType(_CheckIfStringValidInDir_(self, self.ZOSAPI.SystemData.FieldType, field_type))
