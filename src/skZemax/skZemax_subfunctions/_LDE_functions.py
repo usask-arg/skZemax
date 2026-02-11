@@ -939,7 +939,10 @@ def _run_NormUnPol_raytrace_(self, opened_batch_ray_trace:ZOSAPI_Tools_RayTrace_
                                                                     ray_trace_rays.Ycosine.roll(surf=1)*ray_trace_rays.Ynormal+
                                                                     ray_trace_rays.Zcosine.roll(surf=1)*ray_trace_rays.Znormal))).values
     ray_trace_rays.angle_in.values[np.isnan(ray_trace_rays.angle_in.values)] = 0.0
-    ray_trace_rays.angle_in.values[:,0,:] = 0.0
+    if "wvln" in ray_trace_rays.angle_in.dims:
+        ray_trace_rays.angle_in.values[:,0,:] = 0.0
+    else:
+        ray_trace_rays.angle_in.values[0,:] = 0.0
     return ray_trace_rays
     
 
