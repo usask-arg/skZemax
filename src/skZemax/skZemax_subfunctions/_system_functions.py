@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Union
-from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import __LowLevelZemaxStringCheck__, _CheckIfStringValidInDir_
+from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import __LowLevelZemaxStringCheck__, _CheckIfStringValidInDir_, _SetAttrByStringIfValid_
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._LDE_functions import _convert_raw_surface_input_, LDE_GetNumberOfSurfaces, ZOSAPI_Editors_LDE_ILDERow
 
@@ -44,6 +44,7 @@ def System_GetNamesOfAllApertureSettings(self, print_to_console:bool=False)->lis
     """
     This function builds a list of all the system aperture settings in Zemax.
     This can be useful to look up what one may want to code as input to functions like :func:`System_SetApertureProperty`.
+    This is only applicable in Sequential mode.
 
     :param print_to_console: If True will print to console, defaults to False
     :type print_to_console: bool, optional
@@ -60,11 +61,25 @@ def System_GetNamesOfAllApertureSettings(self, print_to_console:bool=False)->lis
 
 def System_SetApertureProperty(self, apertureProperty:str="ApertureValue", apertureValue:Union[float,int,str,bool]=10.0)->None:
     """
-    Sets the system aperture in Zemax.
+    Sets the system aperture in Zemax. This is only applicable in Sequential mode. 
+    Properties are:
+        - "ApertureType": The type of aperture to use. See 2.1.1.1. Aperture (System Explorer). 
+        - "ApertureValue": The system aperture value meaning depends upon the system aperture type selected. See 2.1.1.1. Aperture (System Explorer). 
+        - "ApodizationType": The type of anodization to apply. See 2.1.1.1. Aperture (System Explorer). 
+        - "ApodizationFactor": The apodization factor determines how fast the amplitude decays in the pupil. Used only for Gaussian apodization.
+        - "AFocalImageSpace": If this box is checked, Zemax will perform most analysis features in a manner appropriate for optical systems with output beams in image space that are nominally collimated.
+        - "FastSemiDiameters": computes "automatic" clear semi-diameter or semi-diameters to estimate the clear aperture required on each surface to pass all rays at all field points and wavelengths. 
+        - "CheckGRINApertures": If True, this setting instructs Zemax to check all gradient index ray traces for surface aperture vignetting.
+        - "SemiDiameterMargin": The clear semi-diameter or semi-diameter of every surface in "automatic" mode, is computed to be the radial aperture required to pass all rays without clipping.
+        - "SemiDiameterMarginPct": This semi diameter margin control allows specification of an additional amount of radial aperture as a percentage.
+        - "TelecentricObjectSpace": If True,Zemax will assume the entrance pupil is located at infinity, regardless of the location of the stop surface.
+        - "IterateSolvesWhenUpdating": Solves placed on parameters in the Lens Data Editor sometimes require iteration to compute accurately. 
 
-    :param apertureProperty: _description_, defaults to "ApertureValue"
+    See 2.1.1.1. Aperture (System Explorer) in the help pdf for more detail.
+
+    :param apertureProperty: The name of the aperture property to set, defaults to "ApertureValue"
     :type apertureProperty: str, optional
-    :param apertureValue: _description_, defaults to 10.0
+    :param apertureValue: The value to set the property to, defaults to 10.0
     :type apertureValue: Union[float,int,str,bool], optional
     """
 
@@ -72,7 +87,10 @@ def System_SetApertureProperty(self, apertureProperty:str="ApertureValue", apert
         # If value is a sting, check to see if it can be looked up in a Zemax enum.
         # i.e. if apertureProperty="ApertureType", see if apertureValue matches something
         # in self.ZOSAPI.SystemData.ZemaxApertureType.
-        value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData.Zemax" + str(apertureProperty)), apertureValue)
+        try:
+            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData.Zemax" + str(apertureProperty.replace(' ', ''))), apertureValue)
+        except Exception as e:
+            cp('!@ly!@System_SetApertureProperty :: Raised Exception of [!@lm!@{}!@ly!@]. You likely did not supply a known apertureProperty.'.format(e))
     else:
         value = apertureValue
     self._SetAttrByStringIfValid_(self.TheSystem.SystemData.Aperture, apertureProperty, value)
@@ -81,6 +99,8 @@ def System_SetGlobalCoordinateReferenceSurface(self, reference_surface:Union[int
     """
     Sets the Global Coordinate Reference Surface. This is a special property under the Aperture properties.
     Local coordinate systems are defined (with rotation and translation matrices) from this global reference surface.
+
+    This is only applicable in Sequential mode.
 
     Usually this is specified with an index indicating the surface of either your sequential or non-sequential system. 
     However, Zemax supports some general default options:
@@ -109,6 +129,137 @@ def System_SetGlobalCoordinateReferenceSurface(self, reference_surface:Union[int
             eval("self.TheSystem.SystemData.Aperture.GCRS.Use" + reference_surface.title() + "Surface()")
         except:
             cp('!@ly!@System_SetGlobalCoordinateReferenceSurface :: Surface type of [!@lm!@{}!@ly!@] not found. Expected one of: "Image", "Object", or "Stop"'.format(reference_surface))
+
+def System_SetEnvironmentProperty(self, environmentProperty:str="AdjustIndexToEnvironment", environmentValue:Union[float,int,bool]=False)->None:
+    """
+    Sets if the index of refractions are adjusted to the environment (temperature and pressure).
+    This should work for both Sequential and Non-Sequential modes.
+
+    Properties are:
+        - "AdjustIndexToEnvironment": Enables/disables the adjustment to the environment properties
+        - "Temperature": If adjust_index_data_to_environment, then this is the temperature in celsius to use
+        - "Pressure": If adjust_index_data_to_environment, then this is the pressure in atmospheres to use
+
+    :param environmentProperty: The property of the environment to set. Options are: "AdjustIndexToEnvironment", "Temperature" (in degrees C), and "Pressure" (in ATM), defaults to "AdjustIndexToEnvironment"
+    :type environmentProperty: str, optional
+    :param environmentValue: Value to set the environment property to, defaults to False
+    :type environmentValue: Union[float,int,bool], optional
+    """
+    _SetAttrByStringIfValid_(self, self.TheSystem.SystemData.Environment, environmentProperty, environmentValue)
+
+def System_SetPolarizationProperty(self, polarizationProperty:str="ConvertThinFilmPhaseToRayEquivalent", polarizationValue:Union[float,int,str,bool]=True)->True:
+    """
+    The default input polarization state for many Sequential analysis computations which use polarization ray tracing.
+    For Non-Sequential mode, most polarization settings are controlled by the sources, but two settings can still be controlled here.
+
+        Sequential and Non-Sequential Mode:
+            - "ConvertThinFilmPhaseToRayEquivalent": converts the polarization phase computed using thin film conventions to phase along the ray. If unselected, the ray coefficients will not be converted from the field coefficients. The recommended and default setting is to convert the field thin film phase to ray phase.
+            - "Method": selects the method used to determine the S and P vectors based on the ray vector. Values are:
+                - "XAxis": The P vector is determined from K cross X, and S = P cross K. This method is the default.
+                - "YAxis": The S vector is determined from Y cross K, and P = K cross S
+                - "ZAxis": The S vector is determined from K cross Z, and P = K cross S
+
+        Sequential Mode Only:
+            - "Unpolarized": If True, then the polarization values Jx, Jy, X-Phase, and Y-Phase are ignored, and an unpolarized computation is done.
+            - If Unpolarized == False:
+                - "Jx": the magnitude of the electric field in X
+                - "Jy": the magnitude of the electric field in Y
+                - "XPhase": the phase X angle in degrees
+                - "YPhase": the phase Y angle in degrees
+
+    One should read 2.1.1.5.7. Defining the Initial Polarization of the Zemax help pdf file for more information.
+
+    :param polarizationProperty: The name of the polarization property to set, defaults to "ConvertThinFilmPhaseToRayEquivalent"
+    :type polarizationProperty: str, optional
+    :param polarizationValue: The value to set the property to, defaults to True
+    :type polarizationValue: Union[float,int,str,bool], optional
+    """
+
+    if isinstance(polarizationValue, str):
+        # If value is a sting, check to see if it can be looked up in a Zemax enum.
+        # i.e. if polarizationProperty="Method", see if polarizationValue matches something.
+        try:
+            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData.Polarization" + str(polarizationProperty.lower().replace(' ', '').replace('_', '').replace('Reference', 'Method')).title()), polarizationValue)
+        except Exception as e:
+            cp('!@ly!@System_SetPolarizationProperty :: Raised Exception of [!@lm!@{}!@ly!@]. You likely did not supply a known polarizationProperty.'.format(e))
+    else:
+        value = polarizationValue
+    _SetAttrByStringIfValid_(self, self.TheSystem.SystemData.Polarization, polarizationProperty, value)
+
+def System_SetAdvancedProperty(self, advancedProperty:str="ReferenceOPD", advancedValue:Union[float,int,str,bool]="ExitPupil")->True:
+    """
+    This function sets any advanced system properties. 
+    This is mostly applicable to Sequential mode, but there are some options for Non-Sequential mode which can be set here too.
+
+        Sequential and Non-Sequential Mode:
+            - "TurnOffThreading": If True will not split calculations into multiple threads of execution. The only reason to turn off threading is if insufficient memory exists to break calculations into separate threads.
+            - "IncludeCalculatedDataInSessionFile": If True, then calculated data for all open analysis windows (sequential mode) and/or all detectors (non-sequential mode) will be cached in the current session file.
+            - "IncludeToleranceDataInSessionFile": If True, then tolerance data will be cached in the current session file. 
+        
+        Sequential Mode Only:
+            - "ReferenceOPD":  the OPD represents the phase error of the wavefront forming an image. Any deviations from zero OPD contribute to a degradation of the diffraction image formed by the optical system. Options are:
+                - "ExitPupil": (Zemax default) OPD is computed for a given ray, the ray is traced through the optical system, all the way to the image surface, and then is traced backward to the "reference sphere" which lies in the exit pupil.
+                - "Infinity": The reference to "Infinity" makes the assumption that the exit pupil is very far away and that the OPD correction term is given strictly by the angular error in the ray.
+                - "Absolute": The reference to "Absolute" and "Absolute 2" means that OpticStudio does not add any correction term to the OPD computation: the OPD is the difference of optical path length up to a reference plane between the chief ray and the ray being considered.
+                - "Absolute2": Very similar to "Absolute", see Zemax help pdf for detail.
+            - "ParaxialRays":
+                - "IgnoreCoordinateBreaks": (Zemax default) By ignoring tilts and decenters, OpticStudio can compute the paraxial properties of an equivalent centered system, which is generally the correct approach even for systems without symmetry.
+                - "ConsiderCoordinateBreaks":  For ray tracing through gratings, coordinate breaks may be required even for paraxial rays, otherwise, the rays may not be able to satisfy the grating equation. Ray tracing through non-sequential objects may also require that paraxial rays consider coordinate breaks.
+            - "FNumMethod":
+                - "TracingRays": (Zemax default) computes the paraxial and working F/# of a system using ray tracing.
+                - "PupilSizePosition": The preferred method of modeling systems with very large F/#s is to use afocal mode. 
+            - "HuygensIntegralMethod": The selection for this option determines what phase reference is used in the exit pupil for computing the Huygens Integral
+                - "Auto": (Zemax default) Allow Zemax to control which phase reference is used to compute the Huygens Integral.
+                - "Planar": always use a planar phase reference.
+                - "Spherical": always use a spherical phase reference.
+            - "DontPrintCoordinateBreakData": If True, selected data will not be printed for coordinate break surfaces. 
+            - "OPDModulo2PI": If True, all OPD data will be computed as the fractional part of the total OPD. All OPD computations will return results that are between -π and +π, or -0.5 and +0.5 waves. 
+
+    One should read 2.1.1.6. Advanced Options (System Explorer) of the Zemax help pdf file for more information on all of the above.
+
+    :param polarizationProperty: The name of the polarization property to set, defaults to "ReferenceOPD"
+    :type polarizationProperty: str, optional
+    :param polarizationValue: The value to set the property to, defaults to "ExitPupil"
+    :type polarizationValue: Union[float,int,str,bool], optional
+    """
+
+    if isinstance(advancedValue, str):
+        # If value is a sting, check to see if it can be looked up in a Zemax enum.
+        # Formatting strings to avoid case sensitivity / do auto-formatting for user
+        if (('opd' in advancedProperty.lower() and 'mod' not in advancedProperty.lower()) or 
+            ('opd' in advancedProperty.lower() and 'pi' in advancedProperty.lower()) or 
+            'reference' in advancedProperty.lower()):
+            advancedProperty = "ReferenceOPD"
+        elif 'ray' in advancedProperty.lower() or 'paraxial' in advancedProperty.lower():
+            advancedProperty = "ParaxialRays"
+        elif ('method' in advancedProperty.lower() and 'huy' not in advancedProperty.lower()) or ('fnum' in advancedProperty.lower()):
+            advancedProperty = "FNumMethod"
+        elif 'huy' in advancedProperty.lower():
+            advancedProperty = "HuygensIntegralMethod"
+        elif 'mod' in advancedProperty.lower() or 'pi' in advancedProperty.lower():
+            advancedProperty = "OPDModulo2PI"
+        elif 'coord' in advancedProperty.lower():
+            advancedProperty = "DontPrintCoordinateBreakData"
+        elif 'thread' in advancedProperty.lower():
+            advancedProperty = "TurnOffThreading"
+        elif 'calc' in advancedProperty.lower() and 'session' in advancedProperty.lower():
+            advancedProperty = "IncludeCalculatedDataInSessionFile"
+        elif 'toler' in advancedProperty.lower() and 'session' in advancedProperty.lower():
+            advancedProperty = "IncludeToleranceDataInSessionFile"
+        else:
+            cp('!@ly!@System_SetAdvancedProperty :: Do not understand property of [!@lm!@{}!@ly!@].'.format(advancedProperty))
+
+        if "FNumMethod" not in advancedProperty and "HuygensIntegralMethod" not in advancedProperty:
+            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData." + advancedProperty + 'Setting'), advancedValue)
+        elif "HuygensIntegralMethod" in advancedProperty:
+            # ZOSAPI includes a "s" on "settings" for Huygens
+            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData." + str(advancedProperty.replace('Method', '')) + 'Settings'), advancedValue)
+        else:
+            # ZOSAPI module calls FNumMethod FNumberComputationType
+            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData." + str(advancedProperty.replace('Num','Number').replace('Method', '')) + 'ComputationType'), advancedValue)
+    else:
+        value = advancedValue
+    _SetAttrByStringIfValid_(self, self.TheSystem.SystemData.Advanced, advancedProperty, value)
 
 def System_GetMode(self)->str:
     """

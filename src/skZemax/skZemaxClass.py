@@ -50,7 +50,7 @@ class skZemaxClass(PythonStandaloneApplication):
         Solver_LDESurfaceProperty_ForValue, Solver_LocalOptimization, Solver_MCEMakeConfigOp_ForValue, Solver_MCEMakeConfigOpVariable, Solver_QuickFocus_SpotSize
     from skZemax.skZemax_subfunctions._system_functions import System_GetNamesOfAllMaterialCatalogs, System_AddMaterialCatalog, System_GetIfInNonSequentialMode, System_GetIfInSequentialMode, \
         System_GetMode, System_GetNamesOfAllApertureSettings, System_Lockdown, System_SetApertureProperty, System_SetGlobalCoordinateReferenceSurface, System_SetNonSequentialMode, System_SetSequentialMode, \
-            System_ConvertSequentialToNonSequential
+            System_ConvertSequentialToNonSequential, System_SetEnvironmentProperty, System_SetPolarizationProperty, System_SetAdvancedProperty
     from skZemax.skZemax_subfunctions._utility_functions import Utilities_skZemaxExampleDir, Utilities_ConfigFilesDir, Utilities_DetectorFilesDir, Utilities_OpenZemaxFile, Utilities_MakeNewZemaxFile, \
         Utilities_SaveZemaxFile, Utilities_SaveZemaxFileAs, Utilities_GetAllSystemUnits, Utilities_AnalysesFilesDir, Utilities_MainProgramDir, Utilities_ZemaxInstallationExampleDir, \
             Utilities_ZemaxInstallationCADObjectDir, Utilities_ZemaxInstallationCoatingDir, Utilities_ZemaxInstallationImageDir, Utilities_ZemaxInstallationMaterialDir, Utilities_ZemaxInstallationPolygonObjectDir, \
