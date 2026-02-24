@@ -192,7 +192,7 @@ def Analyses_ReportSystemPrescription(self, save_textfile_path:str=None)->list:
         save_path = save_textfile_path
     result = self.Analyses_RunAnalysesAndGetResults(analysis='PrescriptionDataSettings')
     result.GetTextFile(save_path)
-    with open(save_path, 'r') as file:
+    with open(save_path, 'r', errors="replace") as file:
         content = file.read()
     system_prescription = [x for x in content.replace('\x00', '').strip('ÿþ').split('\n') if len(x)>0]
     return system_prescription
@@ -216,9 +216,43 @@ def Analyses_ReportSurfacePrescription(self, in_Surface: Union[int, ZOSAPI_Edito
         save_path = save_textfile_path
     result = self.Analyses_RunAnalysesAndGetResults(analysis='SurfaceDataSetting', analysis_settings=np.array([self._convert_raw_surface_input_(in_Surface, return_index=True)]))
     result.GetTextFile(save_path)
-    with open(save_path, 'r') as file:
+    with open(save_path, 'r', errors="replace") as file:
         content = file.read()
     return [x for x in content.replace('\x00', '').strip('ÿþ').split('\n') if len(x)>0]
+
+@staticmethod
+def Analyses_ExtractSectionOfTextFile(in_file:Union[list, str], start_marker:str=None, end_marker:str=None)->list:
+    """
+    This is just a convince function which will extract only a section of a text file.
+    Typically these text files are the output made by skZemax Analyses function (but this function is agnostic to where the text file came form).
+    For instance, this can be useful for selection of only a part of an optical prescription.
+
+    See Example 03.
+
+    :param in_file: Can be a list where each element is a line of a loaded text file, or a string to a path to load the text file.
+    :type in_file: Union[list, str]
+    :param start_marker: The starting marker denoting when to begin selecting a part of the text, defaults to None (start at the beginning)
+    :type start_marker: str, optional
+    :param end_marker: The ending marker denoting when to stop selecting a part of the text, defaults to None (goes to the end)
+    :type end_marker: str, optional
+    :return: a list where each element is a line of the (sectioned) text file.
+    :rtype: list
+    """
+    if isinstance(in_file, str):
+        with open(in_file, 'r', errors="replace") as file:
+            content = file.read()
+        in_file = [x for x in content.replace('\x00', '').strip('ÿþ').split('\n') if len(x)>0]
+    section = []
+    inside = start_marker is None
+    for line in in_file:
+        if start_marker.lower() in line.lower():
+            inside = True
+            continue
+        if inside and end_marker is not None and end_marker.lower() in line.lower():
+            break
+        if inside:
+            section.append(line)
+    return section
 
 def Analyses_Footprint(self,
                        in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow],

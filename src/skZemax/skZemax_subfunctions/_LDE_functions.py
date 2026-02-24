@@ -613,6 +613,26 @@ def LDE_SetTiltDecenterAfterSurfaceMode(self, in_Surface: Union[int, ZOSAPI_Edit
     else:
         cp('!@ly!@LDE_SetTiltDecenterAfterSurfaceMode :: Expected [!@lm!@string!@ly!@] or [!@lm!@tuple!@ly!@] as input. Got [!@lm!@{}!@ly!@].'.format(str(type(mode))))
 
+def LDE_GetObjectRotationAndPositionMatrices(self, in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow])->tuple[np.ndarray, np.ndarray]:
+    """
+    Looks up an LDE object and returns the object's rotation matrix and position information w/r to the global coordiante system.
+    See Example 07.
+
+    :param in_Surface: The surface to change as an object or as an index.
+    :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
+    :return:  tuple of object's ([x, y, z], R matrix) as np.ndarrays 
+    :rtype: tuple[np.ndarray, np.ndarray]
+    """
+    in_Surface = self._convert_raw_surface_input_(in_Surface, return_index=True)
+    global_transofmrations = self.TheSystem.LDE.GetGlobalMatrix(in_Surface)
+    # After comapring with Zemax itself, GetGlobalMatrix() seems to return bad R coefficent values. Offsets seem okay still.
+    # This is done through the operand 'GLCR' which only uses two input parameters:
+    #   the surface number, and the rotation matrix entry number.
+    # The API call to get the operand needs 8 inputs, so we will use zeros as the dummies that don't matter. 
+    # The 3 x 3 R matrix has 9 components. If Data is 1, GLCR returns R[1][1], if Data is 2, GLCR returns R[1][2], etc... through Data = 9 returning R[3][3].
+    R = np.array(self.MFE_GetOperandValues('GLCR', np.array([[in_Surface, x+1, 0, 0, 0, 0, 0, 0] for x in range(9)])).reshape(3,3))
+    return np.array([global_transofmrations[-3], global_transofmrations[-2], global_transofmrations[-1]]), R
+
 def LDE_RunRayTrace(self, ray_trace_rays:xr.Dataset=None)->xr.Dataset:
     """
     This funcion executes a sequential ray trace.
@@ -907,7 +927,7 @@ def _run_NormUnPol_raytrace_(self, opened_batch_ray_trace:ZOSAPI_Tools_RayTrace_
     # Add global system variables
     global_transofmrations = np.array([self.TheSystem.LDE.GetGlobalMatrix(int(x)) for x in ray_trace_rays.surf.values])
     # After comapring with Zemax itself, GetGlobalMatrix() seems to return bad R coefficent values. Offsets seem okay still.
-    # Could go through self.MFE_GetOperandValues() instead, but this is direct.
+    # Could go through self.LDE_GetObjectRotationAndPositionMatrices() instead, but this is direct.
     # This is done through the operand 'GLCR' which  only uses two input parameters:
     #   the surface number, and the rotation matrix entry number.
     # The API call to get the operand needs 8 inputs, so we will use zeros as the dummies that don't matter. 
