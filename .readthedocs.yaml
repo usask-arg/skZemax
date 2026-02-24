@@ -10,6 +10,11 @@ build:
     - uv sync
     - uv run sphinx-build -b html docs/source $READTHEDOCS_OUTPUT/html
 
+python:
+  install:
+    - method: pip
+      path: .
+
 sphinx:
    configuration: docs/source/conf.py
 
