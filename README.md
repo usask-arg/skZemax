@@ -30,15 +30,5 @@ and the latest nightly available version is available through
 ## Usage
 Documentation can be found at  https://skZemax.readthedocs.io/
 
-## Troubleshooting
-
-An underlying library imposed by the `PythonStandaloneApplication()` class of ZOS-API is the `pythonnet` package.
-This package has a module called `clr` which unfortunately shares the same name as a another python package you may have installed.
-If you have an import error invoking `clr` run:
-
-`pip uninstall clr`
-
-`pip install pythonnet`
-
 ## License
 This project is licensed under the MIT license

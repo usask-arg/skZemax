@@ -67,13 +67,11 @@ if __name__ == '__main__':
     # skZemax.Utilities_OpenZemaxFile(skZemax.Utilities_skZemaxExampleDir() + os.sep + r'e01_new_file_and_quickfocus.zmx', False)
     skZemax.Utilities_OpenZemaxFile(r'E:\_OfficerRepositories\ZemaxRepos\skzemax_show\src\skZemax_SHOW\skSHS_end_to_end_files\BVI\Front_End\SHOW_FrontEnd_V15_stockLenses_2025_02_02.zmx', False)
     ray_trace = skZemax.LDE_RunRayTrace(ray_trace_rays=skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(Hx=np.array([0]), 
-                                                                                              Hy=np.array([0]),
-                                                                                                Px=np.array([0]),
-                                                                                                  Py=np.array([1]), wavelengths=None))
+                                                                                              Hy=np.array([0]), wavelengths=None))
     # ray_trace = skZemax.LDE_RunRayTrace(skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(Hx=np.array([0]), 
     #                                            Hy=np.array([0]), 
     #                                            Px=np.cos(np.linspace(0, 2 * np.pi, 150, endpoint=False)),
     #                                            Py=np.sin(np.linspace(0, 2 * np.pi, 150, endpoint=False)), do_all_surfaces_to_ending=False))
-    ray_trace.sel(surf=43).reset_coords('wavelengths_idx', drop=True).plot.scatter(x="X", y='Y')
+    ray_trace.sel(surf=30).reset_coords('wavelengths_idx', drop=True).plot.scatter(x="X", y='Y')
     a = 1
     #

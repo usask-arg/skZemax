@@ -7,11 +7,18 @@ name = "skZemax"
 dynamic = ["version"]
 description="A python API developed by the University of Saskatchewan Atmospheric Research Group to interface with Ansys Zemax OpticStudio. "
 readme = "README.md"
-dependencies = ['numpy', 'alive-progress', 'pythonnet']
 authors = [
     { name = "Daniel Letros", email = "daniel.letros@usask.ca" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.13"
+
+dependencies = [
+    "alive-progress>=3.3.0",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.2",
+    "pythonnet>=3.0.5",
+    "xarray>=2026.2.0",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3 :: Only",
