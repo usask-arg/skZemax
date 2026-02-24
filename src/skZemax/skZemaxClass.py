@@ -76,3 +76,4 @@ if __name__ == '__main__':
     #                                            Py=np.sin(np.linspace(0, 2 * np.pi, 150, endpoint=False)), do_all_surfaces_to_ending=False))
     ray_trace.sel(surf=43).reset_coords('wavelengths_idx', drop=True).plot.scatter(x="X", y='Y')
     a = 1
+    #
