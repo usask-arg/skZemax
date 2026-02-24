@@ -3,14 +3,14 @@ version: 2
 build:
   os: ubuntu-22.04
   tools:
-    python: "mambaforge-22.9"
+    python: "3.13"
 
-  jobs:
-    pre_build:
-      - pip install .
+  commands:
+    - pip install uv
+    - uv sync
+    - uv run sphinx-build -b html docs/source $READTHEDOCS_OUTPUT/html
 
 sphinx:
    configuration: docs/source/conf.py
 
-conda:
-  environment: env.yml
+
