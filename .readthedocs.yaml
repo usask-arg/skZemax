@@ -2,15 +2,12 @@ version: 2
 
 build:
   os: ubuntu-22.04
-  apt_packages:
-    - mono-complete
   
   tools:
     python: "3.13"
 
   commands:
     - pip install uv
-    - pip install -U pythonnet
     - uv sync
     - uv run sphinx-build -b html docs/source $READTHEDOCS_OUTPUT/html
 

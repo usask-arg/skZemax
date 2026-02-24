@@ -12,7 +12,7 @@ copyright = "2024, USask-ARG"
 author = "USask-ARG"
 github_url = "https://github.com/usask-arg/skZemax"
 
-
+nb_execution_mode = "off"
 # release: str = get_version(project)
 release: str = ""
 version: str = ".".join(release.split(".")[:2])
