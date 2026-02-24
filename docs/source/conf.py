@@ -12,7 +12,10 @@ copyright = "2024, USask-ARG"
 author = "USask-ARG"
 github_url = "https://github.com/usask-arg/skZemax"
 
+# Disable some stuff for RTD that doesn't work.
 nb_execution_mode = "off"
+autodoc_mock_imports = ["pythonnet"]
+
 # release: str = get_version(project)
 release: str = ""
 version: str = ".".join(release.split(".")[:2])
