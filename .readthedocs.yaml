@@ -4,7 +4,6 @@ build:
   os: ubuntu-22.04
   apt_packages:
     - mono-complete
-    - libmono-2.0-1
   
   tools:
     python: "3.13"
