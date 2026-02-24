@@ -905,6 +905,7 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
     trace_wavelengths_individually: bool = True,
     ray_type: str = "Real",
     OPD_mode: str = "None",
+    should_meshgrid:bool = True
 ) -> xr.Dataset:
     """
     This function sets up custom `unpolarized` rays in Zemax's `normalized` coordiante system.
@@ -991,6 +992,8 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
     :type ray_type: str, optional
     :param OPD_mode: The type of OPD scheme to apply (see desciprtion above), defaults to 'None'
     :type OPD_mode: str, optional
+    :param should_meshgrid: If True a ray for every Hx and Hy pair will be made for every pair of Px and Py, else the Hx, Hy, Px, and Py arrays will be taken directly, defaults to True
+    :type should_meshgrid: bool, optional
     :return: An xarray of rays ready to be traced by :func:`LDE_RunRayTrace`
     :rtype: xr.Dataset
     """
@@ -1018,26 +1021,40 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
     wavelengths_um = np.array(
         [self.Wavelength_GetWavelength(x).Wavelength for x in wavelengths_idx]
     )
-    HX, HY = np.meshgrid(Hx, Hy)
-    HX = HX[np.abs(HX) <= 1]
-    HY = HY[np.abs(HY) <= 1]
-    if "Rect" not in Field_GetNormalization(self):
-        radius = np.sqrt(HX**2 + HY**2)
-        HX = HX[radius <= 1]
-        HY = HY[radius <= 1]
-    # Normazlied pupil is always radial
-    PX, PY = np.meshgrid(Px, Py)
-    PX = PX[np.abs(PX) <= 1]
-    PY = PY[np.abs(PY) <= 1]
-    radius = np.sqrt(PX**2 + PY**2)
-    PX = PX[radius <= 1]
-    PY = PY[radius <= 1]
+    def _check_bounds_(in_hx, in_hy, in_px, in_py):
+        in_hx = in_hx[np.abs(in_hx) <= 1]
+        in_hy = in_hy[np.abs(in_hy) <= 1]
+        if "Rect" not in Field_GetNormalization(self):
+            radius = np.sqrt(in_hx**2 + in_hy**2)
+            in_hx = in_hx[radius <= 1]
+            in_hy = in_hy[radius <= 1]
+        # Normazlied pupil is always radial
+        in_px = in_px[np.abs(in_px) <= 1]
+        in_py = in_py[np.abs(in_py) <= 1]
+        radius = np.sqrt(in_px**2 + in_py**2)
+        in_px = in_px[radius <= 1]
+        in_py = in_py[radius <= 1]
+        return in_hx, in_hy, in_px, in_py
+    if should_meshgrid:
+        HX, HY = np.meshgrid(Hx, Hy)
+        PX, PY = np.meshgrid(Px, Py)
+        HX, HY, PX, PY = _check_bounds_(HX, HY, PX, PY)
+        HXarray   = np.repeat(HX, PX.shape[0]).astype(float)
+        HYarray   = np.repeat(HY, PX.shape[0]).astype(float)
+        PXarray   = np.tile(PX, HX.shape[0]).astype(float)
+        PYarray   = np.tile(PY, HX.shape[0]).astype(float)
+    else:
+        Hx, Hy, Px, Py = _check_bounds_(Hx, Hy, Px, Py)
+        HXarray   = Hx.astype(float)
+        HYarray   = Hy.astype(float)
+        PXarray   = Px.astype(float)
+        PYarray   = Py.astype(float)
     return xr.Dataset(
         {
-            "Hx": ("ray", np.repeat(HX, PX.shape[0]).astype(float)),
-            "Hy": ("ray", np.repeat(HY, PX.shape[0]).astype(float)),
-            "Px": ("ray", np.tile(PX, HX.shape[0]).astype(float)),
-            "Py": ("ray", np.tile(PY, HX.shape[0]).astype(float)),
+            "Hx": ("ray", HXarray),
+            "Hy": ("ray", HYarray),
+            "Px": ("ray", PXarray),
+            "Py": ("ray", PYarray),
         },
         coords={
             "wavelengths_um": ("wvln", wavelengths_um.astype(float)),

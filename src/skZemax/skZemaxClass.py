@@ -262,7 +262,7 @@ if __name__ == "__main__":
     )
     ray_trace = skZemax.LDE_RunRayTrace(
         ray_trace_rays=skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(
-            Hx=np.array([0]), Hy=np.array([0]), wavelengths=None
+            Hx=np.array([0]), Hy=np.array([0]), Px=np.array([0.0]), Py=np.array([0.0]), wavelengths=None, should_meshgrid=False,
         )
     )
     # ray_trace = skZemax.LDE_RunRayTrace(skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(Hx=np.array([0]),
