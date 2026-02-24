@@ -6,6 +6,8 @@ build:
     python: "3.13"
 
   commands:
+    - apt install -y libmono-2.0-1
+    - apt install -y mono-complete
     - pip install uv
     - uv sync
     - uv run sphinx-build -b html docs/source $READTHEDOCS_OUTPUT/html
