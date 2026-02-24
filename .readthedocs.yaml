@@ -8,7 +8,7 @@ build:
   commands:
     - pip install uv
     - uv sync
-    - uv run -- docs\make html
+    - uv run sphinx-build -b html docs/source $READTHEDOCS_OUTPUT/html
 
 sphinx:
    configuration: docs/source/conf.py
