@@ -1,7 +1,7 @@
 # SkZemax - Still In Development 
 
 [![Anaconda-Server Badge](https://anaconda.org/usask-arg/usask_arg_example/badges/version.svg)](https://anaconda.org/usask-arg/usask_arg_example)
-[![Documentation Status](https://readthedocs.org/projects/usask_arg_example/badge/?version=latest)](https://skzemax.readthedocs.io/en/latest/index.html)
+[![Documentation Status](https://app.readthedocs.org/projects/skzemax/badge/?version=latest)](https://skzemax.readthedocs.io/en/latest/index.html)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/usask-arg/usask_arg_example/main.svg)](https://results.pre-commit.ci/latest/github/usask-arg/usask_arg_example/main)
 
 This package provides a class `skZemaxClass()` to interface with the `PythonStandaloneApplication()` class of Zemax.
