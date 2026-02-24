@@ -1,18 +1,22 @@
+from __future__ import annotations
+
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 
-def CAD_ExportSequentialCadSTPFileAs(self, 
-                                     in_file_path:str,
-                                     first_surface:int=1,
-                                     last_surface:int=None,
-                                     number_of_rays:int=7,
-                                     ray_pattern:str='XYFan',
-                                     delete_vignetted:bool=False,
-                                     configuration_number:int=None,
-                                     wavelength_num:int=None,
-                                     field_num:int=None,
-                                     export_dummy:bool=False,
-                                     solid_surfaces:bool=True,
-                                     )->None:
+
+def CAD_ExportSequentialCadSTPFileAs(
+    self,
+    in_file_path: str,
+    first_surface: int = 1,
+    last_surface: int | None = None,
+    number_of_rays: int = 7,
+    ray_pattern: str = "XYFan",
+    delete_vignetted: bool = False,
+    configuration_number: int | None = None,
+    wavelength_num: int | None = None,
+    field_num: int | None = None,
+    export_dummy: bool = False,
+    solid_surfaces: bool = True,
+) -> None:
     """
     Exports a cad file of the current optical system.
 
@@ -41,19 +45,21 @@ def CAD_ExportSequentialCadSTPFileAs(self,
     """
 
     if self.System_GetIfInSequentialMode():
-        in_file_path = in_file_path.split('.')[0] + ".STP"
+        in_file_path = in_file_path.split(".", maxsplit=1)[0] + ".STP"
         if last_surface is None:
-            last_surface = self.LDE_GetNumberOfSurfaces()-1
-        CadTool                       = self.TheSystem.Tools.OpenExportCAD()
-        CadTool.FirstSurface          = int(first_surface)
-        CadTool.LastSurface           = int(last_surface)
-        CadTool.NumberOfRays          = int(number_of_rays)
-        CadTool.RayPattern            = self._CheckIfStringValidInDir_(self.ZOSAPI.Tools.General.RayPatternType, ray_pattern)
-        CadTool.DeleteVignetted       = bool(delete_vignetted)
-        CadTool.ExportDummySurfaces   = bool(export_dummy)
-        CadTool.SurfacesAsSolids      = bool(solid_surfaces)
+            last_surface = self.LDE_GetNumberOfSurfaces() - 1
+        CadTool = self.TheSystem.Tools.OpenExportCAD()
+        CadTool.FirstSurface = int(first_surface)
+        CadTool.LastSurface = int(last_surface)
+        CadTool.NumberOfRays = int(number_of_rays)
+        CadTool.RayPattern = self._CheckIfStringValidInDir_(
+            self.ZOSAPI.Tools.General.RayPatternType, ray_pattern
+        )
+        CadTool.DeleteVignetted = bool(delete_vignetted)
+        CadTool.ExportDummySurfaces = bool(export_dummy)
+        CadTool.SurfacesAsSolids = bool(solid_surfaces)
         if configuration_number is None:
-             CadTool.SetCurrentConfiguration()
+            CadTool.SetCurrentConfiguration()
         else:
             CadTool.Configuration = int(configuration_number)
         if wavelength_num is None:
@@ -65,6 +71,9 @@ def CAD_ExportSequentialCadSTPFileAs(self,
         else:
             CadTool.Field = int(field_num)
         CadTool.OutputFileName = in_file_path
-        if self._verbose: cp('!@lg!@ExportSequentialCadSTPFileAs :: Exporting Zemax CAD File As [!@lm!@%s!@lg!@].'%in_file_path)
+        if self._verbose:
+            cp(
+                f"!@lg!@ExportSequentialCadSTPFileAs :: Exporting Zemax CAD File As [!@lm!@{in_file_path}!@lg!@]."
+            )
         CadTool.RunAndWaitForCompletion()
         CadTool.Close()

@@ -1,10 +1,15 @@
-from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _convert_raw_input_worker_, __LowLevelZemaxStringCheck__
-from typing import Union
+from __future__ import annotations
+
+
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
+from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
+    _convert_raw_input_worker_,
+)
 
-type ZOSAPI_Editors_MCE_IMCERow = object #<- ZOSAPI.Editors.MCE.IMCERow # The actual module is referenced by the base PythonStandaloneApplication class.
+type ZOSAPI_Editors_MCE_IMCERow = object  # <- ZOSAPI.Editors.MCE.IMCERow # The actual module is referenced by the base PythonStandaloneApplication class.
 
-def MCE_GetNumberOfConfigs(self)->int:
+
+def MCE_GetNumberOfConfigs(self) -> int:
     """
     Returns the total number of current configurations
 
@@ -13,7 +18,8 @@ def MCE_GetNumberOfConfigs(self)->int:
     """
     return int(self.TheSystem.MCE.NumberOfConfigurations)
 
-def MCE_GetCurrentConfig(self)->int:
+
+def MCE_GetCurrentConfig(self) -> int:
     """
     Gets the currently active configuration index.
 
@@ -22,7 +28,8 @@ def MCE_GetCurrentConfig(self)->int:
     """
     return int(self.TheSystem.MCE.CurrentConfiguration)
 
-def MCE_AddConfig(self, with_pickups:bool=False):
+
+def MCE_AddConfig(self, with_pickups: bool = False):
     """
     Adds a new Zemax Configuration.
 
@@ -31,7 +38,8 @@ def MCE_AddConfig(self, with_pickups:bool=False):
     """
     self.TheSystem.MCE.AddConfiguration(with_pickups)
 
-def MCE_InsertConfig(self, config_idx:int, with_pickups:bool=False):
+
+def MCE_InsertConfig(self, config_idx: int, with_pickups: bool = False):
     """
     Inserts a new Zemax Configuration at index.
 
@@ -43,7 +51,7 @@ def MCE_InsertConfig(self, config_idx:int, with_pickups:bool=False):
     self.TheSystem.MCE.InsertConfiguration(config_idx, with_pickups)
 
 
-def MCE_DeleteConfig(self, config_idx:int):
+def MCE_DeleteConfig(self, config_idx: int):
     """
     Deletes a Zemax Configuration.
 
@@ -53,10 +61,14 @@ def MCE_DeleteConfig(self, config_idx:int):
     if config_idx <= self.MCE_GetNumberOfConfigs() and config_idx > 0:
         self.TheSystem.MCE.DeleteConfiguration(config_idx)
     else:
-        if self._verbose: cp('!@ly!@MCE_SetActiveConfig :: Asked for configuration [!@lm!@{}!@ly!@] but there are only !@lm!@1-{}!@ly!@ configurations built.'.format(config_idx, self.MCE_GetNumberOfConfigs()))
+        if self._verbose:
+            cp(
+                f"!@ly!@MCE_SetActiveConfig :: Asked for configuration [!@lm!@{config_idx}!@ly!@] but there are only !@lm!@1-{self.MCE_GetNumberOfConfigs()}!@ly!@ configurations built."
+            )
         return
 
-def MCE_MakeAllSingleConfig(self, deleteMFEOperands:bool=False):
+
+def MCE_MakeAllSingleConfig(self, deleteMFEOperands: bool = False):
     """
     Removes all configurations and operands. Reduces everything back to a single configuration.
 
@@ -65,7 +77,8 @@ def MCE_MakeAllSingleConfig(self, deleteMFEOperands:bool=False):
     """
     self.TheSystem.MCE.MakeSingleConfigurationOpt(deleteMFEOperands)
 
-def MCE_SetActiveConfig(self, config_idx:int):
+
+def MCE_SetActiveConfig(self, config_idx: int):
     """
     Sets the active Zemax Configuration.
 
@@ -75,13 +88,25 @@ def MCE_SetActiveConfig(self, config_idx:int):
     if config_idx <= self.MCE_GetNumberOfConfigs() and config_idx > 0:
         self.TheSystem.MCE.SetCurrentConfiguration(config_idx)
     else:
-        if self._verbose: cp('!@ly!@MCE_SetActiveConfig :: Asked for configuration [!@lm!@{}!@ly!@] but there are only !@lm!@1-{}!@ly!@ configurations built.'.format(config_idx, self.MCE_GetNumberOfConfigs()))
+        if self._verbose:
+            cp(
+                f"!@ly!@MCE_SetActiveConfig :: Asked for configuration [!@lm!@{config_idx}!@ly!@] but there are only !@lm!@1-{self.MCE_GetNumberOfConfigs()}!@ly!@ configurations built."
+            )
         return
 
-def _convert_raw_MCEOper_input_(self, in_op: Union[int, ZOSAPI_Editors_MCE_IMCERow], return_index:bool=True)->Union[int, ZOSAPI_Editors_MCE_IMCERow]:
-    return _convert_raw_input_worker_(self, in_value=in_op, object_type=self.ZOSAPI.Editors.MCE.IMCERow, return_index=return_index)
 
-def MCE_GetCurrentNumOperands(self)->int:
+def _convert_raw_MCEOper_input_(
+    self, in_op: int | ZOSAPI_Editors_MCE_IMCERow, return_index: bool = True
+) -> int | ZOSAPI_Editors_MCE_IMCERow:
+    return _convert_raw_input_worker_(
+        self,
+        in_value=in_op,
+        object_type=self.ZOSAPI.Editors.MCE.IMCERow,
+        return_index=return_index,
+    )
+
+
+def MCE_GetCurrentNumOperands(self) -> int:
     """
     Gets the total number of multi-configuration operands in the current configuration.
 
@@ -90,7 +115,8 @@ def MCE_GetCurrentNumOperands(self)->int:
     """
     return int(self.TheSystem.MCE.NumberOfOperands)
 
-def MCE_GetConfigOperand(self, op_idx:int)->ZOSAPI_Editors_MCE_IMCERow:
+
+def MCE_GetConfigOperand(self, op_idx: int) -> ZOSAPI_Editors_MCE_IMCERow:
     """
     Gets the multi-configuration operand at index.
 
@@ -101,7 +127,8 @@ def MCE_GetConfigOperand(self, op_idx:int)->ZOSAPI_Editors_MCE_IMCERow:
     """
     return self.TheSystem.MCE.GetOperandAt(op_idx)
 
-def MCE_AddConfigOperand(self)->ZOSAPI_Editors_MCE_IMCERow:
+
+def MCE_AddConfigOperand(self) -> ZOSAPI_Editors_MCE_IMCERow:
     """
     Adds a new multi-configuration operand to the end of the configuration editor.
 
@@ -110,16 +137,22 @@ def MCE_AddConfigOperand(self)->ZOSAPI_Editors_MCE_IMCERow:
     """
     return self.TheSystem.MCE.AddOperand()
 
-def MCE_DeleteConfigOperand(self, in_op: Union[int, ZOSAPI_Editors_MCE_IMCERow]):
+
+def MCE_DeleteConfigOperand(self, in_op: int | ZOSAPI_Editors_MCE_IMCERow):
     """
     Deletes an multi-configuration operand.
 
     :param in_op: The multi-configuration operand to delete (object or index).
     :type in_op: Union[int, ZOSAPI_Editors_MCE_IMCERow]
     """
-    self.TheSystem.MCE.RemoveOperandAt(self._convert_raw_MCEOper_input_(in_op, return_index=True))
+    self.TheSystem.MCE.RemoveOperandAt(
+        self._convert_raw_MCEOper_input_(in_op, return_index=True)
+    )
 
-def MCE_InsertConfigOperand(self, in_op: Union[int, ZOSAPI_Editors_MCE_IMCERow])->ZOSAPI_Editors_MCE_IMCERow:
+
+def MCE_InsertConfigOperand(
+    self, in_op: int | ZOSAPI_Editors_MCE_IMCERow
+) -> ZOSAPI_Editors_MCE_IMCERow:
     """
     Inserts a new multi-configuration operand.
 
@@ -128,23 +161,28 @@ def MCE_InsertConfigOperand(self, in_op: Union[int, ZOSAPI_Editors_MCE_IMCERow])
     :return: The new operand object.
     :rtype: ZOSAPI_Editors_MCE_IMCERow
     """
-    return self.TheSystem.MCE.InsertNewOperandAt(self._convert_raw_MCEOper_input_(in_op, return_index=True))
+    return self.TheSystem.MCE.InsertNewOperandAt(
+        self._convert_raw_MCEOper_input_(in_op, return_index=True)
+    )
 
-def MCE_SetOperand(self, in_op: Union[int, ZOSAPI_Editors_MCE_IMCERow],
-                   operand_type:str,
-                   param1   : Union[int,str,float]=0,
-                   param2   : Union[int,str,float]=0,
-                   param3   : Union[int,str,float]=0,
-                   operand_values: list[tuple]=None,
-                   )->ZOSAPI_Editors_MCE_IMCERow:
+
+def MCE_SetOperand(
+    self,
+    in_op: int | ZOSAPI_Editors_MCE_IMCERow,
+    operand_type: str,
+    param1: int | str | float = 0,
+    param2: int | str | float = 0,
+    param3: int | str | float = 0,
+    operand_values: list[tuple] | None = None,
+) -> ZOSAPI_Editors_MCE_IMCERow:
     """
     Configures the multi-configuration operand. A user is directed to read Zemax documentation (help doc and API doc) - in particular 2.3.4.1. Multi-Configuration Operands.
-    
-    operand_type: There are *a lot* of them, just read the documents.
-    param#: 
-    operand_values: 
 
-    :param in_op: A string identifying the configuration operand. 
+    operand_type: There are *a lot* of them, just read the documents.
+    param#:
+    operand_values:
+
+    :param in_op: A string identifying the configuration operand.
     :type in_op: Union[int, ZOSAPI_Editors_MCE_IMCERow]
     :param operand_type: _description_
     :type operand_type: str
@@ -159,27 +197,43 @@ def MCE_SetOperand(self, in_op: Union[int, ZOSAPI_Editors_MCE_IMCERow],
     :return: The operand object
     :rtype: ZOSAPI_Editors_MCE_IMCERow
     """
+
     def _assign_(invalue, in_cell):
         in_cell = int(in_cell)
         if in_cell <= num_of_configs and in_cell > 0:
             if isinstance(invalue, int):
                 try:
                     in_op.GetOperandCell(in_cell).IntegerValue = invalue
-                except:
-                    in_op.GetOperandCell(in_cell).Value = str(invalue) # If fail, fall back to string input.
+                except Exception:
+                    in_op.GetOperandCell(in_cell).Value = str(
+                        invalue
+                    )  # If fail, fall back to string input.
             elif isinstance(invalue, float):
                 try:
                     in_op.GetOperandCell(in_cell).DoubleValue = invalue
-                except:
-                    in_op.GetOperandCell(in_cell).Value = str(invalue) # If fail, fall back to string input.
+                except Exception:
+                    in_op.GetOperandCell(in_cell).Value = str(
+                        invalue
+                    )  # If fail, fall back to string input.
             else:
                 in_op.GetOperandCell(in_cell).Value = str(invalue)
         else:
-            if self._verbose: cp('!@ly!@MCE_SetOperand :: Attempted to adjust configuration'
-            ' [!@lm!@%i!@ly!@] but there are only !@lm!@1-%i!@ly!@ configurations built.' % (in_cell, self.MCE_GetNumberOfConfigs()))
-    num_of_configs =  self.MCE_GetNumberOfConfigs()
+            if self._verbose:
+                cp(
+                    "!@ly!@MCE_SetOperand :: Attempted to adjust configuration"
+                    " [!@lm!@%i!@ly!@] but there are only !@lm!@1-%i!@ly!@ configurations built."
+                    % (in_cell, self.MCE_GetNumberOfConfigs())
+                )
+
+    num_of_configs = self.MCE_GetNumberOfConfigs()
     in_op = self._convert_raw_MCEOper_input_(in_op, return_index=False)
-    in_op.ChangeType(self._CheckIfStringValidInDir_(self.ZOSAPI.Editors.MCE.MultiConfigOperandType, operand_type, check_if_upper=True))
+    in_op.ChangeType(
+        self._CheckIfStringValidInDir_(
+            self.ZOSAPI.Editors.MCE.MultiConfigOperandType,
+            operand_type,
+            check_if_upper=True,
+        )
+    )
     in_op.Param1 = param1
     in_op.Param2 = param2
     in_op.Param3 = param3

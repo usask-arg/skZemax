@@ -1,17 +1,32 @@
-from typing import Union
-from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _convert_raw_input_worker_, __LowLevelZemaxStringCheck__, _CheckIfStringValidInDir_
-from skZemax.skZemax_subfunctions._c_print import c_print as cp
-import numpy as np
+from __future__ import annotations
+
 import os
-type ZOSAPI_Editors_NCE_INCERow         = object #<- ZOSAPI.Editors.NCE.INCERow # The actual module is referenced by the base PythonStandaloneApplication class.
-type ZOSAPI_Editors_NCE_ObjectColumn    = object #<- ZOSAPI.Editors.NCE.ObjectColumn # The actual module is referenced by the base PythonStandaloneApplication class.
-type ZOSAPI_Editors_NCE_IEditorCell     = object #<- ZOSAPI.Editors.IEditorCell # The actual module is referenced by the base PythonStandaloneApplication class.
+
+import numpy as np
+
+from skZemax.skZemax_subfunctions._c_print import c_print as cp
+from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
+    _CheckIfStringValidInDir_,
+    _convert_raw_input_worker_,
+)
+
+type ZOSAPI_Editors_NCE_INCERow = object  # <- ZOSAPI.Editors.NCE.INCERow # The actual module is referenced by the base PythonStandaloneApplication class.
+type ZOSAPI_Editors_NCE_ObjectColumn = object  # <- ZOSAPI.Editors.NCE.ObjectColumn # The actual module is referenced by the base PythonStandaloneApplication class.
+type ZOSAPI_Editors_NCE_IEditorCell = object  # <- ZOSAPI.Editors.IEditorCell # The actual module is referenced by the base PythonStandaloneApplication class.
 
 
-def _convert_raw_obj_input_(self, in_obj: Union[int, ZOSAPI_Editors_NCE_INCERow], return_index:bool=True)->Union[int, ZOSAPI_Editors_NCE_INCERow]:
-    return _convert_raw_input_worker_(self, in_value=in_obj, object_type=self.ZOSAPI.Editors.NCE.INCERow, return_index=return_index)
+def _convert_raw_obj_input_(
+    self, in_obj: int | ZOSAPI_Editors_NCE_INCERow, return_index: bool = True
+) -> int | ZOSAPI_Editors_NCE_INCERow:
+    return _convert_raw_input_worker_(
+        self,
+        in_value=in_obj,
+        object_type=self.ZOSAPI.Editors.NCE.INCERow,
+        return_index=return_index,
+    )
 
-def NCE_GetNumberOfObjects(self)->int:
+
+def NCE_GetNumberOfObjects(self) -> int:
     """
     Get the number of non-sequential component objects.
 
@@ -20,7 +35,8 @@ def NCE_GetNumberOfObjects(self)->int:
     """
     return int(self.TheSystem.NCE.get_NumberOfObjects())
 
-def NCE_GetObject(self, ObjectNum: int)->ZOSAPI_Editors_NCE_INCERow:
+
+def NCE_GetObject(self, ObjectNum: int) -> ZOSAPI_Editors_NCE_INCERow:
     """
     Gets the non-sequential component object at the provided index.
 
@@ -32,21 +48,30 @@ def NCE_GetObject(self, ObjectNum: int)->ZOSAPI_Editors_NCE_INCERow:
     ObjectNum = int(ObjectNum)
     if ObjectNum <= self.NCE_GetNumberOfObjects() and ObjectNum > 0:
         return self.TheSystem.NCE.GetObjectAt(ObjectNum)
-    if self._verbose: cp('!@ly!@NCE_GetObject :: Asked for object [!@lm!@{}!@ly!@] but there are only !@lm!@{}!@ly!@ objects built.'.format(ObjectNum, self.NCE_GetNumberOfObjects()))
+    if self._verbose:
+        cp(
+            f"!@ly!@NCE_GetObject :: Asked for object [!@lm!@{ObjectNum}!@ly!@] but there are only !@lm!@{self.NCE_GetNumberOfObjects()}!@ly!@ objects built."
+        )
     return None
 
-def NCE_InsertNewObject(self, insertObject: Union[int, ZOSAPI_Editors_NCE_INCERow])->ZOSAPI_Editors_NCE_INCERow:
+
+def NCE_InsertNewObject(
+    self, insertObject: int | ZOSAPI_Editors_NCE_INCERow
+) -> ZOSAPI_Editors_NCE_INCERow:
     """
     Inserts a new non-sequential component object at the given location of the system.
 
-    :param insertObject: The location to insert the new NCE object. Specified by either an index or a NCE object. 
+    :param insertObject: The location to insert the new NCE object. Specified by either an index or a NCE object.
     :type insertObject: Union[int, ZOSAPI_Editors_NCE_INCERow]
     :return: The newly inserted NCE object
     :rtype: ZOSAPI_Editors_NCE_INCERow
     """
-    return self.TheSystem.NCE.InsertNewObjectAt(self._convert_raw_obj_input_(insertObject, return_index=True))
+    return self.TheSystem.NCE.InsertNewObjectAt(
+        self._convert_raw_obj_input_(insertObject, return_index=True)
+    )
 
-def NCE_AddNewObject(self)->ZOSAPI_Editors_NCE_INCERow:
+
+def NCE_AddNewObject(self) -> ZOSAPI_Editors_NCE_INCERow:
     """
     Adds a new NCE Object as the last object in the system.
 
@@ -55,27 +80,33 @@ def NCE_AddNewObject(self)->ZOSAPI_Editors_NCE_INCERow:
     """
     return self.TheSystem.NCE.AddObject()
 
-def NCE_RemoveObject(self, delObject: Union[int, ZOSAPI_Editors_NCE_INCERow])->None:
+
+def NCE_RemoveObject(self, delObject: int | ZOSAPI_Editors_NCE_INCERow) -> None:
     """
     Removes the non-sequential component object from the system.
 
-    :param delObject: The location of the NCE object to delete. Specified by either an index or a NCE object. 
+    :param delObject: The location of the NCE object to delete. Specified by either an index or a NCE object.
     :type delObject: Union[int, ZOSAPI_Editors_NCE_INCERow]
     """
-    self.TheSystem.NCE.RemoveObjectAt(self._convert_raw_obj_input_(delObject, return_index=True))
+    self.TheSystem.NCE.RemoveObjectAt(
+        self._convert_raw_obj_input_(delObject, return_index=True)
+    )
 
-def NCE_RunRayTrace(self,
-                    SplitNSCRays:bool=True,
-                    ScatterNSCRays:bool=False,
-                    UsePolarization:bool=True,
-                    IgnoreErrors:bool=True,
-                    SaveRays:bool=False,
-                    SavePaths:bool=False,
-                    NumberOfCores:int=None, #If None will set to max number of cores.
-                    SaveFileName:str='NCERayTrace.ZDR')->None:
+
+def NCE_RunRayTrace(
+    self,
+    SplitNSCRays: bool = True,
+    ScatterNSCRays: bool = False,
+    UsePolarization: bool = True,
+    IgnoreErrors: bool = True,
+    SaveRays: bool = False,
+    SavePaths: bool = False,
+    NumberOfCores: int | None = None,  # If None will set to max number of cores.
+    SaveFileName: str = "NCERayTrace.ZDR",
+) -> None:
     """
     Runs a non-sequential ray trace. See the Zemax help pdf section 4.2.1. Ray Trace for more information.
-    The underlying ZOS-API does not appear to support saving a file to a custom location. Any saved files will always seem to be put in the same folder as the zmx file. 
+    The underlying ZOS-API does not appear to support saving a file to a custom location. Any saved files will always seem to be put in the same folder as the zmx file.
 
     :param SplitNSCRays:  If checked, rays from NSC sources will be statistically split at ray-surface intercepts. Rays entering from the entry port are not affected by this setting, defaults to True
     :type SplitNSCRays: bool, optional
@@ -83,17 +114,17 @@ def NCE_RunRayTrace(self,
     :type ScatterNSCRays: bool, optional
     :param UsePolarization:  If checked, polarization is considered (see pdf document section 2.1.1.5. Polarization (System Explorer)), defaults to True
     :type UsePolarization: bool, optional
-    :param IgnoreErrors:  If checked, errors generated by ray tracing are ignored, and any errors that occur will not 
-                            terminate the ray trace. This should be turned on with caution, since errors may indicate a serious 
+    :param IgnoreErrors:  If checked, errors generated by ray tracing are ignored, and any errors that occur will not
+                            terminate the ray trace. This should be turned on with caution, since errors may indicate a serious
                             flaw in the system being traced. However, some perfectly good systems occasionally have a few rays fail because
                             of finite computer precision or other minor problems. If the "lost energy (errors)" given at the end of the ray trace is small relative to the total
                             power of all sources defined, then the few rays which trigger errors can be safely ignored. See "Lost energy", defaults to True
     :type IgnoreErrors: bool, optional
-    :param SaveRays:  If checked, ray data will be saved to the file name specified. The file name only should be provided with the proper 
+    :param SaveRays:  If checked, ray data will be saved to the file name specified. The file name only should be provided with the proper
                       extension (ZRD, DAT, SDF or TM25RAY) and no folder name, defaults to False
     :type SaveRays: bool, optional
-    :param SavePaths: If checked, ray data will be saved as a PAF file to the file name specified. A PAF file contains the same information, 
-                      and the path data is saved and loaded more quickly from a PAF file from a ZRD. Currently, a PAF file can be used in the 
+    :param SavePaths: If checked, ray data will be saved as a PAF file to the file name specified. A PAF file contains the same information,
+                      and the path data is saved and loaded more quickly from a PAF file from a ZRD. Currently, a PAF file can be used in the
                       Path Analysis tool. The PAF generated ignores the Filter option during the ray trace, defaults to False
     :type SavePaths: bool, optional
     :param NumberOfCores: The number of computer cores to use in the ray trace. None will use all available cores, defaults to None
@@ -101,9 +132,10 @@ def NCE_RunRayTrace(self,
     """
     if NumberOfCores is None:
         import multiprocessing
+
         NumberOfCores = multiprocessing.cpu_count()
-    if '.ZDR' not in SaveFileName:
-        SaveFileName += '.ZDR'
+    if ".ZDR" not in SaveFileName:
+        SaveFileName += ".ZDR"
     NSCRayTrace = self.TheSystem.Tools.OpenNSCRayTrace()
     NSCRayTrace.SplitNSCRays = SplitNSCRays
     NSCRayTrace.ScatterNSCRays = ScatterNSCRays
@@ -111,28 +143,38 @@ def NCE_RunRayTrace(self,
     NSCRayTrace.IgnoreErrors = IgnoreErrors
     NSCRayTrace.NumberOfCores = NumberOfCores
     NSCRayTrace.SavePaths = SavePaths
-    NSCRayTrace.SavePathsFile = SaveFileName.replace('ZDR', 'PAF') # Should only be used by Zemax if SavePaths==True
+    NSCRayTrace.SavePathsFile = SaveFileName.replace(
+        "ZDR", "PAF"
+    )  # Should only be used by Zemax if SavePaths==True
     NSCRayTrace.SaveRays = SaveRays
-    NSCRayTrace.SaveRaysFile = SaveFileName # Should only be used by Zemax if SaveRays==True
+    NSCRayTrace.SaveRaysFile = (
+        SaveFileName  # Should only be used by Zemax if SaveRays==True
+    )
     # number of the detector to clear. Use 0 for all detectors.
     # Note that detector number 1 is the first object that functions as a detector, not object number 1.
     # To clear a specific object, use ClearDetectorObject.
     NSCRayTrace.ClearDetectors(0)
     NSCRayTrace.Run()
-    if  self._verbose:
-        cp('')
-        cp('!@lg!@NCE_RunRayTrace :: Starting ray trace....')
+    if self._verbose:
+        cp("")
+        cp("!@lg!@NCE_RunRayTrace :: Starting ray trace....")
         from alive_progress import alive_bar
+
         with alive_bar(manual=True) as bar:
             while NSCRayTrace.IsRunning:
-                bar(float(NSCRayTrace.Progress)/100)
+                bar(float(NSCRayTrace.Progress) / 100)
             bar(1)
     NSCRayTrace.WaitForCompletion()
     NSCRayTrace.Close()
-    if  self._verbose: cp('!@lg!@NCE_RunRayTrace :: Done ray trace!')
-    if  self._verbose: cp('')
+    if self._verbose:
+        cp("!@lg!@NCE_RunRayTrace :: Done ray trace!")
+    if self._verbose:
+        cp("")
 
-def NCE_ChangeObjectType(self, ObjectNCE: Union[int, ZOSAPI_Editors_NCE_INCERow], object_type:str)->None:
+
+def NCE_ChangeObjectType(
+    self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow, object_type: str
+) -> None:
     """
     Changes the type of the NCE Object
 
@@ -142,14 +184,21 @@ def NCE_ChangeObjectType(self, ObjectNCE: Union[int, ZOSAPI_Editors_NCE_INCERow]
     :type object_type: str
     """
     ObjectNCE = self._convert_raw_obj_input_(ObjectNCE, return_index=False)
-    objecttype = _CheckIfStringValidInDir_(self, self.ZOSAPI.Editors.NCE.ObjectType, str(object_type))
+    objecttype = _CheckIfStringValidInDir_(
+        self, self.ZOSAPI.Editors.NCE.ObjectType, str(object_type)
+    )
     if objecttype is not None:
         ObjectNCE.ChangeType(ObjectNCE.GetObjectTypeSettings(objecttype))
-    elif self._verbose: cp('!@ly!@NCE_ChangeObjectType :: Did not change object')
+    elif self._verbose:
+        cp("!@ly!@NCE_ChangeObjectType :: Did not change object")
 
-def NCE_ColocateObject(self, in_objToChange: Union[int, ZOSAPI_Editors_NCE_INCERow],
-                       in_ReferenceObj: Union[int, ZOSAPI_Editors_NCE_INCERow],
-                       use_reference_flag:bool=False)->None:
+
+def NCE_ColocateObject(
+    self,
+    in_objToChange: int | ZOSAPI_Editors_NCE_INCERow,
+    in_ReferenceObj: int | ZOSAPI_Editors_NCE_INCERow,
+    use_reference_flag: bool = False,
+) -> None:
     """
     Co-locates in_objToChange to in_ReferenceObj with or without a reference flag (depending on use_reference_flag).
 
@@ -157,32 +206,35 @@ def NCE_ColocateObject(self, in_objToChange: Union[int, ZOSAPI_Editors_NCE_INCER
     :type in_objToChange: Union[int, ZOSAPI_Editors_NCE_INCERow]
     :param in_ReferenceObj:  The reference NCE object. Can be given as an index or an NCE object.
     :type in_ReferenceObj: Union[int, ZOSAPI_Editors_NCE_INCERow]
-    :param use_reference_flag: If true the co-location will be done through the "Ref Object" property of the NCE column data, else 
+    :param use_reference_flag: If true the co-location will be done through the "Ref Object" property of the NCE column data, else
                                rotation and position matrices is constructed and applied to do the co-location , defaults to False
     :type use_reference_flag: bool, optional
     """
     if use_reference_flag:
         obj_inf = self.NCE_GetAllColumnDataOfObject(in_objToChange)
-        obj_inf['Ref Object']   = self._convert_raw_obj_input_(in_ReferenceObj, return_index=True)
-        obj_inf['X Position']   = 0
-        obj_inf['Y Position']   = 0
-        obj_inf['Z Position']   = 0
-        obj_inf['Tilt About X'] = 0
-        obj_inf['Tilt About Y'] = 0
-        obj_inf['Tilt About Z'] = 0
+        obj_inf["Ref Object"] = self._convert_raw_obj_input_(
+            in_ReferenceObj, return_index=True
+        )
+        obj_inf["X Position"] = 0
+        obj_inf["Y Position"] = 0
+        obj_inf["Z Position"] = 0
+        obj_inf["Tilt About X"] = 0
+        obj_inf["Tilt About Y"] = 0
+        obj_inf["Tilt About Z"] = 0
         self.NCE_SetAllColumnDataOfObjectFromDict(in_objToChange, obj_inf)
     else:
         xyz, R = self.NCE_GetObjectRotationAndPositionMatrices(in_ReferenceObj)
         obj_inf = self.NCE_GetAllColumnDataOfObject(in_objToChange)
-        obj_inf['X Position']   = xyz[0]
-        obj_inf['Y Position']   = xyz[1]
-        obj_inf['Z Position']   = xyz[2]
-        obj_inf['Tilt About X'] = np.rad2deg(np.arctan2(-1 * R[1, 2], R[2, 2]))
-        obj_inf['Tilt About Y'] = np.rad2deg(np.arcsin(R[0,2]))
-        obj_inf['Tilt About Z'] = np.rad2deg(np.arctan2(-1 * R[0, 1], R[0, 0]))
+        obj_inf["X Position"] = xyz[0]
+        obj_inf["Y Position"] = xyz[1]
+        obj_inf["Z Position"] = xyz[2]
+        obj_inf["Tilt About X"] = np.rad2deg(np.arctan2(-1 * R[1, 2], R[2, 2]))
+        obj_inf["Tilt About Y"] = np.rad2deg(np.arcsin(R[0, 2]))
+        obj_inf["Tilt About Z"] = np.rad2deg(np.arctan2(-1 * R[0, 1], R[0, 0]))
         self.NCE_SetAllColumnDataOfObjectFromDict(in_objToChange, obj_inf)
 
-def _NCE_GetObjectColumns_(self)->tuple[ZOSAPI_Editors_NCE_ObjectColumn, list[str]]: 
+
+def _NCE_GetObjectColumns_(self) -> tuple[ZOSAPI_Editors_NCE_ObjectColumn, list[str]]:
     """
     Worker function which makes a list of good calls for the column data.
     This is required since higher level calls in the underlying ZOS-API don't seem
@@ -192,16 +244,39 @@ def _NCE_GetObjectColumns_(self)->tuple[ZOSAPI_Editors_NCE_ObjectColumn, list[st
     :rtype: tuple[ZOSAPI_Editors_NCE_ObjectColumn, list[str]]
     """
     # Make list of good calls to make for column data
-    object_columns = ['Comment', 'RefObject', 'InsideOf', 'XPosition', 'YPosition',
-                        'ZPosition', 'TiltX', 'TiltY', 'TiltZ', 'Material']
-    par_columns    = [x for x in dir(self.ZOSAPI.Editors.NCE.ObjectColumn) if 'Par' in x and not x.isalpha()]
+    object_columns = [
+        "Comment",
+        "RefObject",
+        "InsideOf",
+        "XPosition",
+        "YPosition",
+        "ZPosition",
+        "TiltX",
+        "TiltY",
+        "TiltZ",
+        "Material",
+    ]
+    par_columns = [
+        x
+        for x in dir(self.ZOSAPI.Editors.NCE.ObjectColumn)
+        if "Par" in x and not x.isalpha()
+    ]
     # Ensure 'ParXX' names are sorted by int in XX
-    object_columns = object_columns + [y for x, y, in sorted(zip([int(x.strip('Par')) for x in par_columns], par_columns))]
-    object_column_calls = [getattr(self.ZOSAPI.Editors.NCE.ObjectColumn, x) for x in object_columns]
+    object_columns = object_columns + [
+        y
+        for x, y in sorted(
+            zip([int(x.strip("Par")) for x in par_columns], par_columns, strict=False)
+        )
+    ]
+    object_column_calls = [
+        getattr(self.ZOSAPI.Editors.NCE.ObjectColumn, x) for x in object_columns
+    ]
     return object_column_calls, object_columns
 
 
-def _NCE_GetObjectCellCalls_(self, ObjectNCE:ZOSAPI_Editors_NCE_INCERow)->tuple[ZOSAPI_Editors_NCE_IEditorCell, list[str]]:  
+def _NCE_GetObjectCellCalls_(
+    self, ObjectNCE: ZOSAPI_Editors_NCE_INCERow
+) -> tuple[ZOSAPI_Editors_NCE_IEditorCell, list[str]]:
     """
     Worker function which makes a list of column cell calls for the column data.
     This is required since higher level calls in the underlying ZOS-API don't seem
@@ -212,37 +287,53 @@ def _NCE_GetObjectCellCalls_(self, ObjectNCE:ZOSAPI_Editors_NCE_INCERow)->tuple[
     :return: A tuple of (NCE column cell calls, NCE column names)
     :rtype: tuple[ZOSAPI_Editors_NCE_IEditorCell, list[str]]
     """
-    object_column_calls, object_columns  = self._NCE_GetObjectColumns_()
+    object_column_calls, object_columns = self._NCE_GetObjectColumns_()
     objectcolumn_calls = [ObjectNCE.GetObjectCell(x) for x in object_column_calls]
     return objectcolumn_calls, object_columns
 
-def NCE_GetObjectColumnEnum(self, in_str:str, ObjectNCE: Union[None, int, ZOSAPI_Editors_NCE_INCERow]=None)->ZOSAPI_Editors_NCE_ObjectColumn: 
+
+def NCE_GetObjectColumnEnum(
+    self, in_str: str, ObjectNCE: None | int | ZOSAPI_Editors_NCE_INCERow = None
+) -> ZOSAPI_Editors_NCE_ObjectColumn:
     """
     Returns the underlying enumerator of a NCE column object matching the input string.
-    
+
     If ObjectNCE is None, then assuming only searching for a base property or one named by 'par#'.
     If ObjectNCE is not None, will search for the property in the surface by name and return the right enum.
 
     :param in_str: The name identifying the object column.
     :type in_str: str
-    :param ObjectNCE: The NCE object. Can be index, the NCE object, or None. 
-                      If None will assume `in_str` is one of: 'Comment', 'RefObject',  'InsideOf', 'XPosition', 'YPosition', 
-                      'ZPosition', 'TiltX, 'TiltY', 'TiltZ', 'Material', or 'Par#' (# = 1 to 90). If not None will search for the 
+    :param ObjectNCE: The NCE object. Can be index, the NCE object, or None.
+                      If None will assume `in_str` is one of: 'Comment', 'RefObject',  'InsideOf', 'XPosition', 'YPosition',
+                      'ZPosition', 'TiltX, 'TiltY', 'TiltZ', 'Material', or 'Par#' (# = 1 to 90). If not None will search for the
                       property in the surface by name and return the right enum, defaults to None
     :type ObjectNCE: Union[None, int, ZOSAPI_Editors_NCE_INCERow], optional
     :return: The column enumerator (attribute) specified by the given name.
     :rtype: ZOSAPI_Editors_NCE_ObjectColumn
     """
     if ObjectNCE is None:
-        return self._CheckIfStringValidInDir_(self.ZOSAPI.Editors.NCE.ObjectColumn, in_str)
-    obj_column_calls, obj_columns = self._NCE_GetObjectCellCalls_(self._convert_raw_obj_input_(ObjectNCE, return_index=False))
+        return self._CheckIfStringValidInDir_(
+            self.ZOSAPI.Editors.NCE.ObjectColumn, in_str
+        )
+    obj_column_calls, obj_columns = self._NCE_GetObjectCellCalls_(
+        self._convert_raw_obj_input_(ObjectNCE, return_index=False)
+    )
     bool_mask = [in_str.lower() in x.Header.lower() for x in obj_column_calls]
     if np.any(bool_mask):
-        return self._CheckIfStringValidInDir_(self.ZOSAPI.Editors.NCE.ObjectColumn, obj_columns[int(np.where(bool_mask)[0][0])])
-    if self._verbose: cp('!@ly!@NCE_GetObjectColumnEnum :: Did not find [!@lm!@{}!@ly!@] in object properties.'.format(in_str))
+        return self._CheckIfStringValidInDir_(
+            self.ZOSAPI.Editors.NCE.ObjectColumn,
+            obj_columns[int(np.where(bool_mask)[0][0])],
+        )
+    if self._verbose:
+        cp(
+            f"!@ly!@NCE_GetObjectColumnEnum :: Did not find [!@lm!@{in_str}!@ly!@] in object properties."
+        )
+    return None
 
 
-def NCE_GetAllColumnDataOfObject(self, ObjectNCE: Union[int, ZOSAPI_Editors_NCE_INCERow])->dict:
+def NCE_GetAllColumnDataOfObject(
+    self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow
+) -> dict:
     """
     Gets all column data of a Non-Sequential object and returns it as a dict.
     This was made for robustness, as direct reference calls on NCE objects (i.e. object.property) do not work correctly.
@@ -255,18 +346,23 @@ def NCE_GetAllColumnDataOfObject(self, ObjectNCE: Union[int, ZOSAPI_Editors_NCE_
     :return: dict of the NCE object's column data.
     :rtype: dict
     """
-    objectcolumn_calls, object_columns = self._NCE_GetObjectCellCalls_(self._convert_raw_obj_input_(ObjectNCE, return_index=False))
-    out = dict()
+    objectcolumn_calls, _object_columns = self._NCE_GetObjectCellCalls_(
+        self._convert_raw_obj_input_(ObjectNCE, return_index=False)
+    )
+    out = {}
     for ocall in objectcolumn_calls:
-        if '(unused)' in ocall.Header and 'Par 0' not in ocall.Header:
-            break # Everything after this should be empty
-        if '(unused)' in ocall.Header:
+        if "(unused)" in ocall.Header and "Par 0" not in ocall.Header:
+            break  # Everything after this should be empty
+        if "(unused)" in ocall.Header:
             pass
         else:
             out[ocall.Header] = ocall.Value
     return out
 
-def NCE_SetAllColumnDataOfObjectFromDict(self, ObjectNCE: Union[int, ZOSAPI_Editors_NCE_INCERow], ObjectNCE_dict:dict)->None:
+
+def NCE_SetAllColumnDataOfObjectFromDict(
+    self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow, ObjectNCE_dict: dict
+) -> None:
     """
     Sets all column data of a Non-Sequential object from a dict.
     This was made for robustness, as direct reference calls on NCE objects (i.e. object.property) do not work correctly.
@@ -279,40 +375,56 @@ def NCE_SetAllColumnDataOfObjectFromDict(self, ObjectNCE: Union[int, ZOSAPI_Edit
     :param ObjectNCE_dict: dict of column data and values. Expected to be the same format as the output of invoking :func:`NCE_GetAllColumnDataOfObject` on the same object.
     :type ObjectNCE_dict: dict
     """
-    objectcolumn_calls, object_columns = self._NCE_GetObjectCellCalls_(self._convert_raw_obj_input_(ObjectNCE, return_index=False))
+    objectcolumn_calls, _object_columns = self._NCE_GetObjectCellCalls_(
+        self._convert_raw_obj_input_(ObjectNCE, return_index=False)
+    )
     for ocall in objectcolumn_calls:
-        if '(unused)' in ocall.Header and 'Par 0' not in ocall.Header:
-            break # Everything after this should be empty
-        if '(unused)' in ocall.Header:
+        if "(unused)" in ocall.Header and "Par 0" not in ocall.Header:
+            break  # Everything after this should be empty
+        if "(unused)" in ocall.Header:
             pass
         elif ObjectNCE_dict[ocall.Header] != ocall.Value:
             if isinstance(ObjectNCE_dict[ocall.Header], int):
                 try:
                     ocall.IntegerValue = ObjectNCE_dict[ocall.Header]
-                except:
-                    ocall.Value = str(ObjectNCE_dict[ocall.Header]) # If fail, fall back to string input.
+                except Exception:
+                    ocall.Value = str(
+                        ObjectNCE_dict[ocall.Header]
+                    )  # If fail, fall back to string input.
             else:
-                ocall.Value =  str(ObjectNCE_dict[ocall.Header])
+                ocall.Value = str(ObjectNCE_dict[ocall.Header])
 
-def NCE_GetObjectRotationAndPositionMatrices(self, in_Object: Union[int, ZOSAPI_Editors_NCE_INCERow])->tuple[np.ndarray, np.ndarray]:
+
+def NCE_GetObjectRotationAndPositionMatrices(
+    self, in_Object: int | ZOSAPI_Editors_NCE_INCERow
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Looks up an NCE object and returns the object's rotation matrix and position information
-    This can be used to co-locate objects without using reference object flags. 
+    This can be used to co-locate objects without using reference object flags.
     See :func:`NCE_ColocateObject` and example 08.
 
     :param in_Object: The NCE object to change. Can be given as an index or an NCE object.
     :type in_Object: Union[int, ZOSAPI_Editors_NCE_INCERow]
-    :return:  tuple of object's ([x, y, z], R matrix) as np.ndarrays 
+    :return:  tuple of object's ([x, y, z], R matrix) as np.ndarrays
     :rtype: tuple[np.ndarray, np.ndarray]
     """
     in_Object = self._convert_raw_obj_input_(in_Object, return_index=True)
-    success, R11, R12, R13, R21, R22, R23, R31, R32, R33, Xo, Yo, Zo = self.TheSystem.NCE.GetMatrix(in_Object)
+    success, R11, R12, R13, R21, R22, R23, R31, R32, R33, Xo, Yo, Zo = (
+        self.TheSystem.NCE.GetMatrix(in_Object)
+    )
     if success:
-        return np.array([Xo, Yo, Zo]), np.array([[R11, R12, R13],[R21, R22, R23], [ R31, R32, R33]])
-    if self._verbose:cp('!@ly!@NCE_GetObjectRotationAndPositionMatrices :: Could not find data of object [!@lm!@%i!@ly!@]'% in_Object)
+        return np.array([Xo, Yo, Zo]), np.array(
+            [[R11, R12, R13], [R21, R22, R23], [R31, R32, R33]]
+        )
+    if self._verbose:
+        cp(
+            "!@ly!@NCE_GetObjectRotationAndPositionMatrices :: Could not find data of object [!@lm!@%i!@ly!@]"
+            % in_Object
+        )
     return None, None
 
-def NCE_ReadZDRFile(self, in_ZDR_abs_path:str, should_print:bool=False)->dict:
+
+def NCE_ReadZDRFile(self, in_ZDR_abs_path: str, should_print: bool = False) -> dict:
     """
     A NCE utility function which reads a ZDR file and stores it as a dictionary.
 
@@ -325,61 +437,86 @@ def NCE_ReadZDRFile(self, in_ZDR_abs_path:str, should_print:bool=False)->dict:
     """
     ZRDReader = self.TheSystem.Tools.OpenRayDatabaseReader()
     ZRDReader.ZRDFile = os.path.abspath(in_ZDR_abs_path)
-    if self._verbose:cp('!@lg!@NCE_ReadZDRFile :: Reading ZDR file [!@lm!@{}!@lg!@]...'.format(os.path.abspath(in_ZDR_abs_path)))
+    if self._verbose:
+        cp(
+            f"!@lg!@NCE_ReadZDRFile :: Reading ZDR file [!@lm!@{os.path.abspath(in_ZDR_abs_path)}!@lg!@]..."
+        )
     ZRDReader.RunAndWaitForCompletion()
     if ZRDReader.Succeeded == 0 and self._verbose:
-        cp('!@ly!@NCE_ReadZDRFile :: Reading ZDR file failed with error [!@lr!@{}!@lg!@]...'.format(ZRDReader.ErrorMessage))
+        cp(
+            f"!@ly!@NCE_ReadZDRFile :: Reading ZDR file failed with error [!@lr!@{ZRDReader.ErrorMessage}!@lg!@]..."
+        )
     # This rest is yucky, but I don't see how to make it better.....
     ZRDResult = ZRDReader.GetResults()
-    out_dict=dict()
-    success_NextResult, rayNumber, waveIndex, wlUM, numSegments = ZRDResult.ReadNextResult()
-    while success_NextResult == True:
+    out_dict = {}
+    success_NextResult, rayNumber, waveIndex, wlUM, numSegments = (
+        ZRDResult.ReadNextResult()
+    )
+    while success_NextResult:
         resctr = rayNumber
-        out_dict['Ray_%i' % resctr] = dict()
-        out_dict['Ray_%i' % resctr]['waveIndex'] = waveIndex
-        out_dict['Ray_%i' % resctr]['wlUM'] = wlUM
-        out_dict['Ray_%i' % resctr]['numSegments'] = numSegments
+        out_dict["Ray_%i" % resctr] = {}
+        out_dict["Ray_%i" % resctr]["waveIndex"] = waveIndex
+        out_dict["Ray_%i" % resctr]["wlUM"] = wlUM
+        out_dict["Ray_%i" % resctr]["numSegments"] = numSegments
         segdata = ZRDResult.ReadNextSegmentFull()
-        while segdata[0] == True:
+        while segdata[0]:
             segctr = segdata[1]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]                    = dict()
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['segmentParent']   = segdata[2]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['hitObj']          = segdata[3]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['hitFace']         = segdata[4]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['insideOf']        = segdata[5]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['status']          = segdata[6]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['x']               = segdata[7]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['y']               = segdata[8]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['z']               = segdata[9]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['l']               = segdata[10]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['m']               = segdata[11]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['n']               = segdata[12]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['exr']             = segdata[13]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['exi']             = segdata[14]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['eyr']             = segdata[15]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['eyi']             = segdata[16]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['ezr']             = segdata[17]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['ezi']             = segdata[18]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['intensity']       = segdata[19]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['pathLength']      = segdata[20]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['xybin']           = segdata[21]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['lmbin']           = segdata[22]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['xNorm']           = segdata[23]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['yNorm']           = segdata[24]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['zNorm']           = segdata[25]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['index']           = segdata[26]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['startingPhase']   = segdata[27]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['phaseOf']         = segdata[28]
-            out_dict['Ray_%i' % resctr]['Segment_%i' % segctr]['phaseAt']         = segdata[29]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr] = {}
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["segmentParent"] = (
+                segdata[2]
+            )
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["hitObj"] = segdata[3]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["hitFace"] = segdata[4]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["insideOf"] = segdata[5]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["status"] = segdata[6]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["x"] = segdata[7]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["y"] = segdata[8]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["z"] = segdata[9]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["l"] = segdata[10]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["m"] = segdata[11]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["n"] = segdata[12]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["exr"] = segdata[13]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["exi"] = segdata[14]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["eyr"] = segdata[15]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["eyi"] = segdata[16]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["ezr"] = segdata[17]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["ezi"] = segdata[18]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["intensity"] = segdata[
+                19
+            ]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["pathLength"] = segdata[
+                20
+            ]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["xybin"] = segdata[21]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["lmbin"] = segdata[22]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["xNorm"] = segdata[23]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["yNorm"] = segdata[24]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["zNorm"] = segdata[25]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["index"] = segdata[26]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["startingPhase"] = (
+                segdata[27]
+            )
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["phaseOf"] = segdata[28]
+            out_dict["Ray_%i" % resctr]["Segment_%i" % segctr]["phaseAt"] = segdata[29]
             segdata = ZRDResult.ReadNextSegmentFull()
-        success_NextResult, rayNumber, waveIndex, wlUM, numSegments = ZRDResult.ReadNextResult()
+        success_NextResult, rayNumber, waveIndex, wlUM, numSegments = (
+            ZRDResult.ReadNextResult()
+        )
     ZRDReader.Close()
-    if self._verbose:cp('!@lg!@NCE_ReadZDRFile :: Reading ZDR file done.')
+    if self._verbose:
+        cp("!@lg!@NCE_ReadZDRFile :: Reading ZDR file done.")
     if should_print:
         for result in out_dict:
-            cp('!@lg!@%s:'%result)
-            [cp('!@lg!@ %s:%s'%(x, out_dict[result][x])) for x in out_dict[result].keys() if 'Segment_' not in x]
-            for segment in [x for x in out_dict[result].keys() if 'Segment_' in x]:
-                cp('!@lc!@  %s:'%segment)
-                [cp('!@lc!@     %s:%s'%(x, out_dict[result][segment][x])) for x in out_dict[result][segment].keys()]
+            cp(f"!@lg!@{result}:")
+            [
+                cp(f"!@lg!@ {x}:{out_dict[result][x]}")
+                for x in out_dict[result]
+                if "Segment_" not in x
+            ]
+            for segment in [x for x in out_dict[result] if "Segment_" in x]:
+                cp(f"!@lc!@  {segment}:")
+                [
+                    cp(f"!@lc!@     {x}:{out_dict[result][segment][x]}")
+                    for x in out_dict[result][segment]
+                ]
     return out_dict

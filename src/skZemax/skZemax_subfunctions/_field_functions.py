@@ -1,13 +1,29 @@
-from typing import Union
-from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import _convert_raw_input_worker_, __LowLevelZemaxStringCheck__, _CheckIfStringValidInDir_, _SetAttrByStringIfValid_
+from __future__ import annotations
+
+
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
+from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
+    __LowLevelZemaxStringCheck__,
+    _CheckIfStringValidInDir_,
+    _convert_raw_input_worker_,
+    _SetAttrByStringIfValid_,
+)
 
-type ZOSAPI_SystemData_IField = object #<- ZOSAPI.SystemData.IField # The actual module is referenced by the base PythonStandaloneApplication class.
+type ZOSAPI_SystemData_IField = object  # <- ZOSAPI.SystemData.IField # The actual module is referenced by the base PythonStandaloneApplication class.
 
-def _convert_raw_field_input_(self, in_field: Union[int, ZOSAPI_SystemData_IField], return_index:bool=True)->Union[int, ZOSAPI_SystemData_IField]:
-    return _convert_raw_input_worker_(self, in_value=in_field, object_type=self.ZOSAPI.SystemData.IField, return_index=return_index)
 
-def Fields_GetNumberOfFields(self)->int:
+def _convert_raw_field_input_(
+    self, in_field: int | ZOSAPI_SystemData_IField, return_index: bool = True
+) -> int | ZOSAPI_SystemData_IField:
+    return _convert_raw_input_worker_(
+        self,
+        in_value=in_field,
+        object_type=self.ZOSAPI.SystemData.IField,
+        return_index=return_index,
+    )
+
+
+def Fields_GetNumberOfFields(self) -> int:
     """
     Returns the total number of current field angles
 
@@ -17,7 +33,8 @@ def Fields_GetNumberOfFields(self)->int:
 
     return int(self.TheSystem.SystemData.Fields.get_NumberOfFields())
 
-def Field_GetField(self, fieldNum:int=1)->ZOSAPI_SystemData_IField:
+
+def Field_GetField(self, fieldNum: int = 1) -> ZOSAPI_SystemData_IField:
     """
     Returns the Field object at the given field index
 
@@ -30,11 +47,14 @@ def Field_GetField(self, fieldNum:int=1)->ZOSAPI_SystemData_IField:
     fieldNum = int(fieldNum)
     if fieldNum <= self.Fields_GetNumberOfFields() and fieldNum > 0:
         return self.TheSystem.SystemData.Fields.GetField(fieldNum)
-    if self._verbose: 
-        cp('!@ly!@Field_GetField :: Asked for field [!@lm!@{}!@ly!@] but there are only !@lm!@{}!@ly!@ fields built.'.format(fieldNum, self.Fields_GetNumberOfFields()))
+    if self._verbose:
+        cp(
+            f"!@ly!@Field_GetField :: Asked for field [!@lm!@{fieldNum}!@ly!@] but there are only !@lm!@{self.Fields_GetNumberOfFields()}!@ly!@ fields built."
+        )
     return None
 
-def Field_DeleteField(self, in_field: Union[int, ZOSAPI_SystemData_IField])->None:
+
+def Field_DeleteField(self, in_field: int | ZOSAPI_SystemData_IField) -> None:
     """
     Deletes a field.
 
@@ -42,9 +62,14 @@ def Field_DeleteField(self, in_field: Union[int, ZOSAPI_SystemData_IField])->Non
     :type in_field: Union[int, ZOSAPI_SystemData_IField]
     """
 
-    self.TheSystem.SystemData.Fields.DeleteFieldAt(self._convert_raw_field_input_(in_field, return_index=True))
+    self.TheSystem.SystemData.Fields.DeleteFieldAt(
+        self._convert_raw_field_input_(in_field, return_index=True)
+    )
 
-def Fields_AddField(self, field_x:float, field_y:float, field_weight:float=1.0)->ZOSAPI_SystemData_IField:
+
+def Fields_AddField(
+    self, field_x: float, field_y: float, field_weight: float = 1.0
+) -> ZOSAPI_SystemData_IField:
     """
     Adds a new field.
 
@@ -57,9 +82,12 @@ def Fields_AddField(self, field_x:float, field_y:float, field_weight:float=1.0)-
     :return: The new field object
     :rtype: ZOSAPI_SystemData_IField
     """
-    return self.TheSystem.SystemData.Fields.AddField(float(field_x), float(field_y), float(field_weight))
+    return self.TheSystem.SystemData.Fields.AddField(
+        float(field_x), float(field_y), float(field_weight)
+    )
 
-def Field_GetAllDataOfField(self, in_field: Union[int, ZOSAPI_SystemData_IField])->dict:
+
+def Field_GetAllDataOfField(self, in_field: int | ZOSAPI_SystemData_IField) -> dict:
     """
     Gets all column data of a Field object and returns it as a dict.
 
@@ -69,12 +97,24 @@ def Field_GetAllDataOfField(self, in_field: Union[int, ZOSAPI_SystemData_IField]
     :rtype: dict
     """
     field_obj = self._convert_raw_field_input_(in_field, return_index=False)
-    out = dict()
-    for key in __LowLevelZemaxStringCheck__(self, self.ZOSAPI.SystemData.FieldColumn, extra_exclude_filter=['get', 'Get', 'set', 'Set', 'Solve', 'solve']):
-        out[key] = _CheckIfStringValidInDir_(self, field_obj, key, extra_exclude_filter=['get', 'Get', 'set', 'Set', 'Solve', 'solve'])
+    out = {}
+    for key in __LowLevelZemaxStringCheck__(
+        self,
+        self.ZOSAPI.SystemData.FieldColumn,
+        extra_exclude_filter=["get", "Get", "set", "Set", "Solve", "solve"],
+    ):
+        out[key] = _CheckIfStringValidInDir_(
+            self,
+            field_obj,
+            key,
+            extra_exclude_filter=["get", "Get", "set", "Set", "Solve", "solve"],
+        )
     return out
 
-def Field_SetAllDataOfFieldFromDict(self, in_field: Union[int, ZOSAPI_SystemData_IField], Field_dict:dict)->None:
+
+def Field_SetAllDataOfFieldFromDict(
+    self, in_field: int | ZOSAPI_SystemData_IField, Field_dict: dict
+) -> None:
     """
     Sets all column data of a Field object and returns it as a dict.
 
@@ -84,10 +124,17 @@ def Field_SetAllDataOfFieldFromDict(self, in_field: Union[int, ZOSAPI_SystemData
     :type Field_dict: dict
     """
     field_obj = self._convert_raw_field_input_(in_field, return_index=False)
-    for key in Field_dict.keys():
-        _SetAttrByStringIfValid_(self, field_obj, key, Field_dict[key], extra_exclude_filter=['get', 'Get', 'set', 'Set', 'Solve', 'solve'])
+    for key in Field_dict:
+        _SetAttrByStringIfValid_(
+            self,
+            field_obj,
+            key,
+            Field_dict[key],
+            extra_exclude_filter=["get", "Get", "set", "Set", "Solve", "solve"],
+        )
 
-def Field_SetFieldType(self, field_type:str='Angle')->None:
+
+def Field_SetFieldType(self, field_type: str = "Angle") -> None:
     """
     Sets the system field type to one of the following options:
 
@@ -111,41 +158,47 @@ def Field_SetFieldType(self, field_type:str='Angle')->None:
     :param field_type: Name of the field type, defaults to 'Angle'
     :type field_type: str, optional
     """
-    self.TheSystem.SystemData.Fields.ConvertToFieldType(_CheckIfStringValidInDir_(self, self.ZOSAPI.SystemData.FieldType, field_type))
+    self.TheSystem.SystemData.Fields.ConvertToFieldType(
+        _CheckIfStringValidInDir_(self, self.ZOSAPI.SystemData.FieldType, field_type)
+    )
 
-def Field_GetFieldType(self)->str:
+
+def Field_GetFieldType(self) -> str:
     """
-    Returns the currently set field type (see :func:`Field_SetFieldType`). 
+    Returns the currently set field type (see :func:`Field_SetFieldType`).
 
     :return: Name of the currently set field type.
     :rtype: str
     """
     return str(self.TheSystem.SystemData.Fields.GetFieldType())
 
-def Field_SetVignettingFactors(self)->None:
+
+def Field_SetVignettingFactors(self) -> None:
     """
     Recomputes the vignetting factors for each field based upon the current lens data. Vignetting factors
     (VDX, VDY, VCX, VCY) are coefficients which describe the apparent entrance pupil size and location for different field
-    positions. These vignetting factors should be left at zero if there is no vignetting in the system. 
-    The set vignetting algorithm estimates the vignetting decenter and compression factors so that the four 
-    marginal rays in the top, bottom, left, and right edges of the pupil pass within the apertures of each surface. 
+    positions. These vignetting factors should be left at zero if there is no vignetting in the system.
+    The set vignetting algorithm estimates the vignetting decenter and compression factors so that the four
+    marginal rays in the top, bottom, left, and right edges of the pupil pass within the apertures of each surface.
     Only the primary wavelength is used.
     """
     self.TheSystem.SystemData.Fields.SetVignetting()
 
-def Field_ClearVignettingFactors(self)->None:
+
+def Field_ClearVignettingFactors(self) -> None:
     """
     Sets vignetting factors to zero.
     """
     self.TheSystem.SystemData.Fields.ClearVignetting()
 
-def Field_SetNormalization(self, normalization:str='Radial')->None:
+
+def Field_SetNormalization(self, normalization: str = "Radial") -> None:
     """
     Sets the type of field normalization to apply.
     This is relevant for specifying rays in normalized normalized x-field coordinate `Hx` and normalized y-field coordinate `Hy`.
 
     See :func:`LDE_BuildRayTraceNormalizedUnpolarizedRays` for a more in-depth description.
-     
+
     Options are:
 
     - Radial
@@ -156,11 +209,14 @@ def Field_SetNormalization(self, normalization:str='Radial')->None:
     :param normalization: Type of normalization to apply when specifying ray coordinates `Hx` and `Hy`, defaults to 'Radial'
     :type normalization: str, optional
     """
-    norm = _CheckIfStringValidInDir_(self, self.ZOSAPI.SystemData.FieldNormalizationType, normalization)
+    norm = _CheckIfStringValidInDir_(
+        self, self.ZOSAPI.SystemData.FieldNormalizationType, normalization
+    )
     if norm is not None:
         self.TheSystem.SystemData.Fields.Normalization = norm
-    
-def Field_GetNormalization(self)->str:
+
+
+def Field_GetNormalization(self) -> str:
     """
     Returns the currently set normalization. See :func:`Field_SetNormalization`.
 

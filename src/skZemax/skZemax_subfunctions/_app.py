@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import os
 import winreg
+
 import clr
+
 
 class PythonStandaloneApplication:
     """
@@ -15,26 +18,37 @@ class PythonStandaloneApplication:
 
         python -m pip install pythonnet
     """
+
     class LicenseException(Exception):
         pass
+
     class ConnectionException(Exception):
         pass
+
     class InitializationException(Exception):
         pass
+
     class SystemNotPresentException(Exception):
         pass
 
     def __init__(self, path=None):
         # determine location of ZOSAPI_NetHelper.dll & add as reference
-        aKey = winreg.OpenKey(winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER), r"Software\Zemax", 0, winreg.KEY_READ)
-        zemaxData = winreg.QueryValueEx(aKey, 'ZemaxRoot')
-        NetHelper = os.path.join(os.sep, zemaxData[0], r'ZOS-API\Libraries\ZOSAPI_NetHelper.dll')
+        aKey = winreg.OpenKey(
+            winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER),
+            r"Software\Zemax",
+            0,
+            winreg.KEY_READ,
+        )
+        zemaxData = winreg.QueryValueEx(aKey, "ZemaxRoot")
+        NetHelper = os.path.join(
+            os.sep, zemaxData[0], r"ZOS-API\Libraries\ZOSAPI_NetHelper.dll"
+        )
         winreg.CloseKey(aKey)
         clr.AddReference(NetHelper)
         import ZOSAPI_NetHelper
 
         # Find the installed version of OpticStudio
-        #if len(path) == 0:
+        # if len(path) == 0:
         if path is None:
             isInitialized = ZOSAPI_NetHelper.ZOSAPI_Initializer.Initialize()
         else:
@@ -45,7 +59,8 @@ class PythonStandaloneApplication:
         if isInitialized:
             dir = ZOSAPI_NetHelper.ZOSAPI_Initializer.GetZemaxDirectory()
         else:
-            raise PythonStandaloneApplication.InitializationException("Unable to locate Zemax OpticStudio.  Try using a hard-coded path.")
+            msg = "Unable to locate Zemax OpticStudio.  Try using a hard-coded path."
+            raise PythonStandaloneApplication.InitializationException(msg)
 
         # add ZOS-API referencecs
         clr.AddReference(os.path.join(os.sep, dir, "ZOSAPI.dll"))
@@ -59,18 +74,22 @@ class PythonStandaloneApplication:
         self.TheConnection = ZOSAPI.ZOSAPI_Connection()
 
         if self.TheConnection is None:
-            raise PythonStandaloneApplication.ConnectionException("Unable to initialize .NET connection to ZOSAPI")
+            msg = "Unable to initialize .NET connection to ZOSAPI"
+            raise PythonStandaloneApplication.ConnectionException(msg)
 
         self.TheApplication = self.TheConnection.CreateNewApplication()
         if self.TheApplication is None:
-            raise PythonStandaloneApplication.InitializationException("Unable to acquire ZOSAPI application")
+            msg = "Unable to acquire ZOSAPI application"
+            raise PythonStandaloneApplication.InitializationException(msg)
 
-        if self.TheApplication.IsValidLicenseForAPI == False:
-            raise PythonStandaloneApplication.LicenseException("License is not valid for ZOSAPI use")
+        if not self.TheApplication.IsValidLicenseForAPI:
+            msg = "License is not valid for ZOSAPI use"
+            raise PythonStandaloneApplication.LicenseException(msg)
 
         self.TheSystem = self.TheApplication.PrimarySystem
         if self.TheSystem is None:
-            raise PythonStandaloneApplication.SystemNotPresentException("Unable to acquire Primary system")
+            msg = "Unable to acquire Primary system"
+            raise PythonStandaloneApplication.SystemNotPresentException(msg)
 
     def __del__(self):
         if self.TheApplication is not None:
@@ -81,21 +100,35 @@ class PythonStandaloneApplication:
 
     def SamplesDir(self):
         if self.TheApplication is None:
-            raise PythonStandaloneApplication.InitializationException("Unable to acquire ZOSAPI application")
+            msg = "Unable to acquire ZOSAPI application"
+            raise PythonStandaloneApplication.InitializationException(msg)
 
         return self.TheApplication.SamplesDir
 
     def ExampleConstants(self):
-        if self.TheApplication.LicenseStatus == self.ZOSAPI.LicenseStatusType.PremiumEdition:
+        if (
+            self.TheApplication.LicenseStatus
+            == self.ZOSAPI.LicenseStatusType.PremiumEdition
+        ):
             return "Premium"
-        if self.TheApplication.LicenseStatus == self.ZOSAPI.LicenseStatusType.EnterpriseEdition:
+        if (
+            self.TheApplication.LicenseStatus
+            == self.ZOSAPI.LicenseStatusType.EnterpriseEdition
+        ):
             return "Enterprise"
-        if self.TheApplication.LicenseStatus == self.ZOSAPI.LicenseStatusType.ProfessionalEdition:
+        if (
+            self.TheApplication.LicenseStatus
+            == self.ZOSAPI.LicenseStatusType.ProfessionalEdition
+        ):
             return "Professional"
-        if self.TheApplication.LicenseStatus == self.ZOSAPI.LicenseStatusType.StandardEdition:
+        if (
+            self.TheApplication.LicenseStatus
+            == self.ZOSAPI.LicenseStatusType.StandardEdition
+        ):
             return "Standard"
-        if self.TheApplication.LicenseStatus == self.ZOSAPI.LicenseStatusType.OpticStudioHPCEdition:
+        if (
+            self.TheApplication.LicenseStatus
+            == self.ZOSAPI.LicenseStatusType.OpticStudioHPCEdition
+        ):
             return "HPC"
         return "Invalid"
-
-

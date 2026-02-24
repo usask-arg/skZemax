@@ -1,11 +1,20 @@
+from __future__ import annotations
+
+
 import numpy as np
-from typing import Union
-from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import __LowLevelZemaxStringCheck__, _CheckIfStringValidInDir_, _SetAttrByStringIfValid_
+
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
-from skZemax.skZemax_subfunctions._LDE_functions import _convert_raw_surface_input_, LDE_GetNumberOfSurfaces, ZOSAPI_Editors_LDE_ILDERow
+from skZemax.skZemax_subfunctions._LDE_functions import (
+    ZOSAPI_Editors_LDE_ILDERow,
+    _convert_raw_surface_input_,
+)
+from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
+    __LowLevelZemaxStringCheck__,
+    _SetAttrByStringIfValid_,
+)
 
 
-def System_GetNamesOfAllMaterialCatalogs(self, print_to_console:bool=False)->list:
+def System_GetNamesOfAllMaterialCatalogs(self, print_to_console: bool = False) -> list:
     """
     This function builds a list of all the material catalogs that Zemax is aware of.
     This can be useful to look up what one may want to code as input to functions like :func:`System_AddMaterialCatalog`.
@@ -15,14 +24,17 @@ def System_GetNamesOfAllMaterialCatalogs(self, print_to_console:bool=False)->lis
     :return: A list of the names of all catalogs the ZOS-API knows.
     :rtype: list
     """
-    available_catalogs = list(self.TheSystem.SystemData.MaterialCatalogs.GetAvailableCatalogs())
+    available_catalogs = list(
+        self.TheSystem.SystemData.MaterialCatalogs.GetAvailableCatalogs()
+    )
     if print_to_console:
-        cp('\n!@lg!@System_GetNamesOfAllMaterialCatalogs :: Names of all Catalogs:')
-        [cp('   !@lm!@' + str(x)) for x in available_catalogs]
-        cp('\n')
+        cp("\n!@lg!@System_GetNamesOfAllMaterialCatalogs :: Names of all Catalogs:")
+        [cp("   !@lm!@" + str(x)) for x in available_catalogs]
+        cp("\n")
     return available_catalogs
 
-def System_AddMaterialCatalog(self, catalog:str='SCHOTT')->None:
+
+def System_AddMaterialCatalog(self, catalog: str = "SCHOTT") -> None:
     """
     Adds a catalog to the current Zemax system.
 
@@ -33,14 +45,21 @@ def System_AddMaterialCatalog(self, catalog:str='SCHOTT')->None:
     :param catalog: Name of a catalog to add, defaults to 'SCHOTT'
     :type catalog: str, optional
     """
-    available_catalogs = self.System_GetNamesOfAllMaterialCatalogs(print_to_console=False)
+    available_catalogs = self.System_GetNamesOfAllMaterialCatalogs(
+        print_to_console=False
+    )
     bool_mask = [str(catalog).lower() in x.lower() for x in available_catalogs]
     if np.any(bool_mask):
-        self.TheSystem.SystemData.MaterialCatalogs.AddCatalog(str(available_catalogs[int(np.where(bool_mask)[0][0])]))
+        self.TheSystem.SystemData.MaterialCatalogs.AddCatalog(
+            str(available_catalogs[int(np.where(bool_mask)[0][0])])
+        )
     else:
-        cp('!@ly!@System_AddMaterialCatalog :: Material catalog [!@lm!@{}!@ly!@] not found.'.format(catalog))
+        cp(
+            f"!@ly!@System_AddMaterialCatalog :: Material catalog [!@lm!@{catalog}!@ly!@] not found."
+        )
 
-def System_GetNamesOfAllApertureSettings(self, print_to_console:bool=False)->list:
+
+def System_GetNamesOfAllApertureSettings(self, print_to_console: bool = False) -> list:
     """
     This function builds a list of all the system aperture settings in Zemax.
     This can be useful to look up what one may want to code as input to functions like :func:`System_SetApertureProperty`.
@@ -51,29 +70,41 @@ def System_GetNamesOfAllApertureSettings(self, print_to_console:bool=False)->lis
     :return: A list of the names of all system apertures in Zemax.
     :rtype: list
     """
-    available_apertures = [x for x in __LowLevelZemaxStringCheck__(self, in_obj=self.TheSystem.SystemData.Aperture, extra_exclude_filter='_') if 'GCRS' not in x]
+    available_apertures = [
+        x
+        for x in __LowLevelZemaxStringCheck__(
+            self, in_obj=self.TheSystem.SystemData.Aperture, extra_exclude_filter="_"
+        )
+        if "GCRS" not in x
+    ]
     if print_to_console:
-        cp('\n!@lg!@System_GetNamesOfAllApertureSettings ::Names of all Aperture Settings:')
-        [cp('   !@lm!@' + str(x)) for x in available_apertures]
-        cp('\n')
+        cp(
+            "\n!@lg!@System_GetNamesOfAllApertureSettings ::Names of all Aperture Settings:"
+        )
+        [cp("   !@lm!@" + str(x)) for x in available_apertures]
+        cp("\n")
     return available_apertures
 
 
-def System_SetApertureProperty(self, apertureProperty:str="ApertureValue", apertureValue:Union[float,int,str,bool]=10.0)->None:
+def System_SetApertureProperty(
+    self,
+    apertureProperty: str = "ApertureValue",
+    apertureValue: float | int | str | bool = 10.0,
+) -> None:
     """
-    Sets the system aperture in Zemax. This is only applicable in Sequential mode. 
+    Sets the system aperture in Zemax. This is only applicable in Sequential mode.
     Properties are:
-        - "ApertureType": The type of aperture to use. See 2.1.1.1. Aperture (System Explorer). 
-        - "ApertureValue": The system aperture value meaning depends upon the system aperture type selected. See 2.1.1.1. Aperture (System Explorer). 
-        - "ApodizationType": The type of anodization to apply. See 2.1.1.1. Aperture (System Explorer). 
-        - "ApodizationFactor": The apodization factor determines how fast the amplitude decays in the pupil. Used only for Gaussian apodization.
-        - "AFocalImageSpace": If this box is checked, Zemax will perform most analysis features in a manner appropriate for optical systems with output beams in image space that are nominally collimated.
-        - "FastSemiDiameters": computes "automatic" clear semi-diameter or semi-diameters to estimate the clear aperture required on each surface to pass all rays at all field points and wavelengths. 
-        - "CheckGRINApertures": If True, this setting instructs Zemax to check all gradient index ray traces for surface aperture vignetting.
-        - "SemiDiameterMargin": The clear semi-diameter or semi-diameter of every surface in "automatic" mode, is computed to be the radial aperture required to pass all rays without clipping.
-        - "SemiDiameterMarginPct": This semi diameter margin control allows specification of an additional amount of radial aperture as a percentage.
-        - "TelecentricObjectSpace": If True,Zemax will assume the entrance pupil is located at infinity, regardless of the location of the stop surface.
-        - "IterateSolvesWhenUpdating": Solves placed on parameters in the Lens Data Editor sometimes require iteration to compute accurately. 
+    - "ApertureType": The type of aperture to use. See 2.1.1.1. Aperture (System Explorer).
+    - "ApertureValue": The system aperture value meaning depends upon the system aperture type selected. See 2.1.1.1. Aperture (System Explorer).
+    - "ApodizationType": The type of anodization to apply. See 2.1.1.1. Aperture (System Explorer).
+    - "ApodizationFactor": The apodization factor determines how fast the amplitude decays in the pupil. Used only for Gaussian apodization.
+    - "AFocalImageSpace": If this box is checked, Zemax will perform most analysis features in a manner appropriate for optical systems with output beams in image space that are nominally collimated.
+    - "FastSemiDiameters": computes "automatic" clear semi-diameter or semi-diameters to estimate the clear aperture required on each surface to pass all rays at all field points and wavelengths.
+    - "CheckGRINApertures": If True, this setting instructs Zemax to check all gradient index ray traces for surface aperture vignetting.
+    - "SemiDiameterMargin": The clear semi-diameter or semi-diameter of every surface in "automatic" mode, is computed to be the radial aperture required to pass all rays without clipping.
+    - "SemiDiameterMarginPct": This semi diameter margin control allows specification of an additional amount of radial aperture as a percentage.
+    - "TelecentricObjectSpace": If True,Zemax will assume the entrance pupil is located at infinity, regardless of the location of the stop surface.
+    - "IterateSolvesWhenUpdating": Solves placed on parameters in the Lens Data Editor sometimes require iteration to compute accurately.
 
     See 2.1.1.1. Aperture (System Explorer) in the help pdf for more detail.
 
@@ -88,21 +119,34 @@ def System_SetApertureProperty(self, apertureProperty:str="ApertureValue", apert
         # i.e. if apertureProperty="ApertureType", see if apertureValue matches something
         # in self.ZOSAPI.SystemData.ZemaxApertureType.
         try:
-            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData.Zemax" + str(apertureProperty.replace(' ', ''))), apertureValue)
+            value = self._CheckIfStringValidInDir_(
+                eval(
+                    "self.ZOSAPI.SystemData.Zemax"
+                    + str(apertureProperty.replace(" ", ""))
+                ),
+                apertureValue,
+            )
         except Exception as e:
-            cp('!@ly!@System_SetApertureProperty :: Raised Exception of [!@lm!@{}!@ly!@]. You likely did not supply a known apertureProperty.'.format(e))
+            cp(
+                f"!@ly!@System_SetApertureProperty :: Raised Exception of [!@lm!@{e}!@ly!@]. You likely did not supply a known apertureProperty."
+            )
     else:
         value = apertureValue
-    self._SetAttrByStringIfValid_(self.TheSystem.SystemData.Aperture, apertureProperty, value)
+    self._SetAttrByStringIfValid_(
+        self.TheSystem.SystemData.Aperture, apertureProperty, value
+    )
 
-def System_SetGlobalCoordinateReferenceSurface(self, reference_surface:Union[int,str]=1)->None:
+
+def System_SetGlobalCoordinateReferenceSurface(
+    self, reference_surface: int | str = 1
+) -> None:
     """
     Sets the Global Coordinate Reference Surface. This is a special property under the Aperture properties.
     Local coordinate systems are defined (with rotation and translation matrices) from this global reference surface.
 
     This is only applicable in Sequential mode.
 
-    Usually this is specified with an index indicating the surface of either your sequential or non-sequential system. 
+    Usually this is specified with an index indicating the surface of either your sequential or non-sequential system.
     However, Zemax supports some general default options:
 
         - Image
@@ -110,27 +154,46 @@ def System_SetGlobalCoordinateReferenceSurface(self, reference_surface:Union[int
         - Stop
 
     These can be given as strings to specify one of these as the global reference.
-        
+
     :param reference_surface: The surface to set as the global - either an index or a string as described above., defaults to 1
     :type reference_surface: Union[int,str], optional
     """
 
     if not isinstance(reference_surface, str):
-        if (int(reference_surface) >= self.TheSystem.SystemData.Aperture.GCRS.FirstAllowedSurface) and (int(reference_surface) <= self.TheSystem.SystemData.Aperture.GCRS.LastAllowedSurface):
-            self.TheSystem.SystemData.Aperture.GCRS.SetSelectedSurface(int(reference_surface))
+        if (
+            int(reference_surface)
+            >= self.TheSystem.SystemData.Aperture.GCRS.FirstAllowedSurface
+        ) and (
+            int(reference_surface)
+            <= self.TheSystem.SystemData.Aperture.GCRS.LastAllowedSurface
+        ):
+            self.TheSystem.SystemData.Aperture.GCRS.SetSelectedSurface(
+                int(reference_surface)
+            )
         else:
-            cp('!@ly!@System_SetGlobalCoordinateReferenceSurface :: Index [!@lm!@{}!@ly!@] not allowed. Must be between  [!@lm!@{}!@ly!@ and !@lm!@{}!@ly!@]'.format(reference_surface,
-                                                                                                                                                                     self.TheSystem.SystemData.Aperture.GCRS.FirstAllowedSurface,
-                                                                                                                                                                     self.TheSystem.SystemData.Aperture.GCRS.LastAllowedSurface))
+            cp(
+                f"!@ly!@System_SetGlobalCoordinateReferenceSurface :: Index [!@lm!@{reference_surface}!@ly!@] not allowed. Must be between  [!@lm!@{self.TheSystem.SystemData.Aperture.GCRS.FirstAllowedSurface}!@ly!@ and !@lm!@{self.TheSystem.SystemData.Aperture.GCRS.LastAllowedSurface}!@ly!@]"
+            )
     else:
         # Just formatting to allow inputs to have "use" or "surface" in the str as well.
         reference_surface = reference_surface.lower().strip("use").strip("surface")
         try:
-            eval("self.TheSystem.SystemData.Aperture.GCRS.Use" + reference_surface.title() + "Surface()")
-        except:
-            cp('!@ly!@System_SetGlobalCoordinateReferenceSurface :: Surface type of [!@lm!@{}!@ly!@] not found. Expected one of: "Image", "Object", or "Stop"'.format(reference_surface))
+            eval(
+                "self.TheSystem.SystemData.Aperture.GCRS.Use"
+                + reference_surface.title()
+                + "Surface()"
+            )
+        except Exception:
+            cp(
+                f'!@ly!@System_SetGlobalCoordinateReferenceSurface :: Surface type of [!@lm!@{reference_surface}!@ly!@] not found. Expected one of: "Image", "Object", or "Stop"'
+            )
 
-def System_SetEnvironmentProperty(self, environmentProperty:str="AdjustIndexToEnvironment", environmentValue:Union[float,int,bool]=False)->None:
+
+def System_SetEnvironmentProperty(
+    self,
+    environmentProperty: str = "AdjustIndexToEnvironment",
+    environmentValue: float | int | bool = False,
+) -> None:
     """
     Sets if the index of refractions are adjusted to the environment (temperature and pressure).
     This should work for both Sequential and Non-Sequential modes.
@@ -145,9 +208,19 @@ def System_SetEnvironmentProperty(self, environmentProperty:str="AdjustIndexToEn
     :param environmentValue: Value to set the environment property to, defaults to False
     :type environmentValue: Union[float,int,bool], optional
     """
-    _SetAttrByStringIfValid_(self, self.TheSystem.SystemData.Environment, environmentProperty, environmentValue)
+    _SetAttrByStringIfValid_(
+        self,
+        self.TheSystem.SystemData.Environment,
+        environmentProperty,
+        environmentValue,
+    )
 
-def System_SetPolarizationProperty(self, polarizationProperty:str="ConvertThinFilmPhaseToRayEquivalent", polarizationValue:Union[float,int,str,bool]=True)->True:
+
+def System_SetPolarizationProperty(
+    self,
+    polarizationProperty: str = "ConvertThinFilmPhaseToRayEquivalent",
+    polarizationValue: float | int | str | bool = True,
+) -> True:
     """
     The default input polarization state for many Sequential analysis computations which use polarization ray tracing.
     For Non-Sequential mode, most polarization settings are controlled by the sources, but two settings can still be controlled here.
@@ -179,23 +252,43 @@ def System_SetPolarizationProperty(self, polarizationProperty:str="ConvertThinFi
         # If value is a sting, check to see if it can be looked up in a Zemax enum.
         # i.e. if polarizationProperty="Method", see if polarizationValue matches something.
         try:
-            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData.Polarization" + str(polarizationProperty.lower().replace(' ', '').replace('_', '').replace('Reference', 'Method')).title()), polarizationValue)
+            value = self._CheckIfStringValidInDir_(
+                eval(
+                    "self.ZOSAPI.SystemData.Polarization"
+                    + str(
+                        polarizationProperty.lower()
+                        .replace(" ", "")
+                        .replace("_", "")
+                        .replace("Reference", "Method")
+                    ).title()
+                ),
+                polarizationValue,
+            )
         except Exception as e:
-            cp('!@ly!@System_SetPolarizationProperty :: Raised Exception of [!@lm!@{}!@ly!@]. You likely did not supply a known polarizationProperty.'.format(e))
+            cp(
+                f"!@ly!@System_SetPolarizationProperty :: Raised Exception of [!@lm!@{e}!@ly!@]. You likely did not supply a known polarizationProperty."
+            )
     else:
         value = polarizationValue
-    _SetAttrByStringIfValid_(self, self.TheSystem.SystemData.Polarization, polarizationProperty, value)
+    _SetAttrByStringIfValid_(
+        self, self.TheSystem.SystemData.Polarization, polarizationProperty, value
+    )
 
-def System_SetAdvancedProperty(self, advancedProperty:str="ReferenceOPD", advancedValue:Union[float,int,str,bool]="ExitPupil")->True:
+
+def System_SetAdvancedProperty(
+    self,
+    advancedProperty: str = "ReferenceOPD",
+    advancedValue: float | int | str | bool = "ExitPupil",
+) -> True:
     """
-    This function sets any advanced system properties. 
+    This function sets any advanced system properties.
     This is mostly applicable to Sequential mode, but there are some options for Non-Sequential mode which can be set here too.
 
         Sequential and Non-Sequential Mode:
             - "TurnOffThreading": If True will not split calculations into multiple threads of execution. The only reason to turn off threading is if insufficient memory exists to break calculations into separate threads.
             - "IncludeCalculatedDataInSessionFile": If True, then calculated data for all open analysis windows (sequential mode) and/or all detectors (non-sequential mode) will be cached in the current session file.
-            - "IncludeToleranceDataInSessionFile": If True, then tolerance data will be cached in the current session file. 
-        
+            - "IncludeToleranceDataInSessionFile": If True, then tolerance data will be cached in the current session file.
+
         Sequential Mode Only:
             - "ReferenceOPD":  the OPD represents the phase error of the wavefront forming an image. Any deviations from zero OPD contribute to a degradation of the diffraction image formed by the optical system. Options are:
                 - "ExitPupil": (Zemax default) OPD is computed for a given ray, the ray is traced through the optical system, all the way to the image surface, and then is traced backward to the "reference sphere" which lies in the exit pupil.
@@ -207,13 +300,13 @@ def System_SetAdvancedProperty(self, advancedProperty:str="ReferenceOPD", advanc
                 - "ConsiderCoordinateBreaks":  For ray tracing through gratings, coordinate breaks may be required even for paraxial rays, otherwise, the rays may not be able to satisfy the grating equation. Ray tracing through non-sequential objects may also require that paraxial rays consider coordinate breaks.
             - "FNumMethod":
                 - "TracingRays": (Zemax default) computes the paraxial and working F/# of a system using ray tracing.
-                - "PupilSizePosition": The preferred method of modeling systems with very large F/#s is to use afocal mode. 
+                - "PupilSizePosition": The preferred method of modeling systems with very large F/#s is to use afocal mode.
             - "HuygensIntegralMethod": The selection for this option determines what phase reference is used in the exit pupil for computing the Huygens Integral
                 - "Auto": (Zemax default) Allow Zemax to control which phase reference is used to compute the Huygens Integral.
                 - "Planar": always use a planar phase reference.
                 - "Spherical": always use a spherical phase reference.
-            - "DontPrintCoordinateBreakData": If True, selected data will not be printed for coordinate break surfaces. 
-            - "OPDModulo2PI": If True, all OPD data will be computed as the fractional part of the total OPD. All OPD computations will return results that are between -π and +π, or -0.5 and +0.5 waves. 
+            - "DontPrintCoordinateBreakData": If True, selected data will not be printed for coordinate break surfaces.
+            - "OPDModulo2PI": If True, all OPD data will be computed as the fractional part of the total OPD. All OPD computations will return results that are between -π and +π, or -0.5 and +0.5 waves.
 
     One should read 2.1.1.6. Advanced Options (System Explorer) of the Zemax help pdf file for more information on all of the above.
 
@@ -226,42 +319,84 @@ def System_SetAdvancedProperty(self, advancedProperty:str="ReferenceOPD", advanc
     if isinstance(advancedValue, str):
         # If value is a sting, check to see if it can be looked up in a Zemax enum.
         # Formatting strings to avoid case sensitivity / do auto-formatting for user
-        if (('opd' in advancedProperty.lower() and 'mod' not in advancedProperty.lower()) or 
-            ('opd' in advancedProperty.lower() and 'pi' in advancedProperty.lower()) or 
-            'reference' in advancedProperty.lower()):
+        if (
+            (
+                "opd" in advancedProperty.lower()
+                and "mod" not in advancedProperty.lower()
+            )
+            or ("opd" in advancedProperty.lower() and "pi" in advancedProperty.lower())
+            or "reference" in advancedProperty.lower()
+        ):
             advancedProperty = "ReferenceOPD"
-        elif 'ray' in advancedProperty.lower() or 'paraxial' in advancedProperty.lower():
+        elif (
+            "ray" in advancedProperty.lower() or "paraxial" in advancedProperty.lower()
+        ):
             advancedProperty = "ParaxialRays"
-        elif ('method' in advancedProperty.lower() and 'huy' not in advancedProperty.lower()) or ('fnum' in advancedProperty.lower()):
+        elif (
+            "method" in advancedProperty.lower()
+            and "huy" not in advancedProperty.lower()
+        ) or ("fnum" in advancedProperty.lower()):
             advancedProperty = "FNumMethod"
-        elif 'huy' in advancedProperty.lower():
+        elif "huy" in advancedProperty.lower():
             advancedProperty = "HuygensIntegralMethod"
-        elif 'mod' in advancedProperty.lower() or 'pi' in advancedProperty.lower():
+        elif "mod" in advancedProperty.lower() or "pi" in advancedProperty.lower():
             advancedProperty = "OPDModulo2PI"
-        elif 'coord' in advancedProperty.lower():
+        elif "coord" in advancedProperty.lower():
             advancedProperty = "DontPrintCoordinateBreakData"
-        elif 'thread' in advancedProperty.lower():
+        elif "thread" in advancedProperty.lower():
             advancedProperty = "TurnOffThreading"
-        elif 'calc' in advancedProperty.lower() and 'session' in advancedProperty.lower():
+        elif (
+            "calc" in advancedProperty.lower() and "session" in advancedProperty.lower()
+        ):
             advancedProperty = "IncludeCalculatedDataInSessionFile"
-        elif 'toler' in advancedProperty.lower() and 'session' in advancedProperty.lower():
+        elif (
+            "toler" in advancedProperty.lower()
+            and "session" in advancedProperty.lower()
+        ):
             advancedProperty = "IncludeToleranceDataInSessionFile"
         else:
-            cp('!@ly!@System_SetAdvancedProperty :: Do not understand property of [!@lm!@{}!@ly!@].'.format(advancedProperty))
+            cp(
+                f"!@ly!@System_SetAdvancedProperty :: Do not understand property of [!@lm!@{advancedProperty}!@ly!@]."
+            )
 
-        if "FNumMethod" not in advancedProperty and "HuygensIntegralMethod" not in advancedProperty:
-            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData." + advancedProperty + 'Setting'), advancedValue)
+        if (
+            "FNumMethod" not in advancedProperty
+            and "HuygensIntegralMethod" not in advancedProperty
+        ):
+            value = self._CheckIfStringValidInDir_(
+                eval("self.ZOSAPI.SystemData." + advancedProperty + "Setting"),
+                advancedValue,
+            )
         elif "HuygensIntegralMethod" in advancedProperty:
             # ZOSAPI includes a "s" on "settings" for Huygens
-            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData." + str(advancedProperty.replace('Method', '')) + 'Settings'), advancedValue)
+            value = self._CheckIfStringValidInDir_(
+                eval(
+                    "self.ZOSAPI.SystemData."
+                    + str(advancedProperty.replace("Method", ""))
+                    + "Settings"
+                ),
+                advancedValue,
+            )
         else:
             # ZOSAPI module calls FNumMethod FNumberComputationType
-            value = self._CheckIfStringValidInDir_(eval("self.ZOSAPI.SystemData." + str(advancedProperty.replace('Num','Number').replace('Method', '')) + 'ComputationType'), advancedValue)
+            value = self._CheckIfStringValidInDir_(
+                eval(
+                    "self.ZOSAPI.SystemData."
+                    + str(
+                        advancedProperty.replace("Num", "Number").replace("Method", "")
+                    )
+                    + "ComputationType"
+                ),
+                advancedValue,
+            )
     else:
         value = advancedValue
-    _SetAttrByStringIfValid_(self, self.TheSystem.SystemData.Advanced, advancedProperty, value)
+    _SetAttrByStringIfValid_(
+        self, self.TheSystem.SystemData.Advanced, advancedProperty, value
+    )
 
-def System_GetMode(self)->str:
+
+def System_GetMode(self) -> str:
     """
     Checks if in Sequential or Non-Sequential mode. returns the name of the mode.
 
@@ -270,7 +405,8 @@ def System_GetMode(self)->str:
     """
     return str(self.TheSystem.Mode)
 
-def System_GetIfInSequentialMode(self)->bool:
+
+def System_GetIfInSequentialMode(self) -> bool:
     """
     Checks if the system is in Sequential mode.
 
@@ -279,7 +415,8 @@ def System_GetIfInSequentialMode(self)->bool:
     """
     return int(self.TheSystem.Mode) == 0
 
-def System_GetIfInNonSequentialMode(self)->bool:
+
+def System_GetIfInNonSequentialMode(self) -> bool:
     """
     Checks if the system is in Non-Sequential mode.
 
@@ -288,40 +425,56 @@ def System_GetIfInNonSequentialMode(self)->bool:
     """
     return int(self.TheSystem.Mode) == 1
 
-def System_SetSequentialMode(self)->bool:
+
+def System_SetSequentialMode(self) -> bool:
     """
     Sets/ensures the current system to be in Sequential mode.
 
     :return: An error checking boolean. True if the mode was set correctly.
     :rtype: bool
     """
- 
-    if self.System_GetIfInNonSequentialMode() and self._verbose: cp('!@lg!@System_SetSequentialMode :: Switching from Non-Sequential mode to Sequential.')
+
+    if self.System_GetIfInNonSequentialMode() and self._verbose:
+        cp(
+            "!@lg!@System_SetSequentialMode :: Switching from Non-Sequential mode to Sequential."
+        )
     ok = self.TheSystem.MakeSequential()
-    if ok and self._verbose: cp('!@lg!@System_SetSequentialMode :: Sequential mode is set.')
-    elif not ok and self._verbose: cp('!@lr!@System_SetSequentialMode :: Sequential mode was not set correctly.')
+    if ok and self._verbose:
+        cp("!@lg!@System_SetSequentialMode :: Sequential mode is set.")
+    elif not ok and self._verbose:
+        cp("!@lr!@System_SetSequentialMode :: Sequential mode was not set correctly.")
     return ok
 
-def System_SetNonSequentialMode(self)->bool:
+
+def System_SetNonSequentialMode(self) -> bool:
     """
     Sets/ensures the current system to be in Non-Sequential mode.
 
     :return: An error checking boolean. True if the mode was set correctly.
     :rtype: bool
     """
-    if self.System_GetIfInSequentialMode() and self._verbose: cp('!@lg!@System_SetNonSequentialMode :: Switching from Sequential mode to Non-Sequential.')
+    if self.System_GetIfInSequentialMode() and self._verbose:
+        cp(
+            "!@lg!@System_SetNonSequentialMode :: Switching from Sequential mode to Non-Sequential."
+        )
     ok = self.TheSystem.MakeNonSequential()
-    if ok and self._verbose: cp('!@lg!@System_SetNonSequentialMode :: Non-Sequential mode is set.')
-    elif not ok and self._verbose: cp('!@lr!@System_SetNonSequentialMode :: Non-Sequential mode was not set correctly.')
+    if ok and self._verbose:
+        cp("!@lg!@System_SetNonSequentialMode :: Non-Sequential mode is set.")
+    elif not ok and self._verbose:
+        cp(
+            "!@lr!@System_SetNonSequentialMode :: Non-Sequential mode was not set correctly."
+        )
     return ok
 
-def System_Lockdown(self,
-                    decimalPrecision:int=None,
-                    excludePickups:bool=None,
-                    usePrecisionRounding:bool=None,
-                    fixModelGlasses:bool=None,
-                    convertSDtoMaxApertures:bool=None,
-                    )->None:
+
+def System_Lockdown(
+    self,
+    decimalPrecision: int | None = None,
+    excludePickups: bool | None = None,
+    usePrecisionRounding: bool | None = None,
+    fixModelGlasses: bool | None = None,
+    convertSDtoMaxApertures: bool | None = None,
+) -> None:
     """
     Runs the system lock-down tool to fix diameters, remove solves, and validating a sequential design prior to manufacturing or conversion to non-sequential, etc.
 
@@ -337,7 +490,8 @@ def System_Lockdown(self,
     :type convertSDtoMaxApertures: bool, optional
     """
 
-    if self._verbose: cp('!@lg!@System_Lockdown :: Locking system down...')
+    if self._verbose:
+        cp("!@lg!@System_Lockdown :: Locking system down...")
     LockdownTool = self.TheSystem.Tools.OpenDesignLockdown()
     if decimalPrecision is not None:
         LockdownTool.DecimalPrecision = int(decimalPrecision)
@@ -346,24 +500,27 @@ def System_Lockdown(self,
     if usePrecisionRounding is not None:
         LockdownTool.UsePrecisionRounding = bool(usePrecisionRounding)
     if fixModelGlasses is not None:
-        LockdownTool.FixModelGlasses  = bool(fixModelGlasses)
+        LockdownTool.FixModelGlasses = bool(fixModelGlasses)
     if convertSDtoMaxApertures is not None:
         LockdownTool.ConvertSDToMaxApertures = bool(convertSDtoMaxApertures)
     LockdownTool.RunAndWaitForCompletion()
     LockdownTool.Close()
-    if self._verbose: cp('!@lg!@System_Lockdown :: Done locking system down.')
+    if self._verbose:
+        cp("!@lg!@System_Lockdown :: Done locking system down.")
 
 
-def System_ConvertSequentialToNonSequential(self, 
-                                            first_surface:Union[int, ZOSAPI_Editors_LDE_ILDERow]=1, 
-                                            last_surface:Union[int, ZOSAPI_Editors_LDE_ILDERow]=None,
-                                            ignore_errors:bool=True,
-                                            create_source_and_detector:bool=False,
-                                            convert_global_coordinates:bool=False,
-                                            convert_stop_to_nsc_aperture:bool=True,
-                                            stop_mechanical_half_width:float=None,
-                                            high_fidelity_conversion:bool=True,
-                                            high_fidelity_resolution:int=65):
+def System_ConvertSequentialToNonSequential(
+    self,
+    first_surface: int | ZOSAPI_Editors_LDE_ILDERow = 1,
+    last_surface: int | ZOSAPI_Editors_LDE_ILDERow = None,
+    ignore_errors: bool = True,
+    create_source_and_detector: bool = False,
+    convert_global_coordinates: bool = False,
+    convert_stop_to_nsc_aperture: bool = True,
+    stop_mechanical_half_width: float | None = None,
+    high_fidelity_conversion: bool = True,
+    high_fidelity_resolution: int = 65,
+):
     """
     Converts a sequential Zemax file to a non-sequential Zemax file.
 
@@ -389,28 +546,46 @@ def System_ConvertSequentialToNonSequential(self,
     :type high_fidelity_resolution: str, optional
     """
     if self.System_GetIfInSequentialMode():
-        if self._verbose: cp('!@lg!@System_ConvertSequentialToNonSequential :: Converting system to Non-Sequential...')
-        converter                             = self.TheSystem.Tools.OpenConvertToNSCGroup()
-        converter.ConvertFileToNSC            = True
-        converter.IgnoreErrors                = bool(ignore_errors)
-        converter.CreateSourcesAndDetectors   = bool(create_source_and_detector)
-        converter.ConvertToGlobalCoordinates  = bool(convert_global_coordinates)
-        converter.ConvertStopToNSCAperture    = bool(convert_stop_to_nsc_aperture)
-        converter.HighFidelityConversion      = bool(high_fidelity_conversion)
+        if self._verbose:
+            cp(
+                "!@lg!@System_ConvertSequentialToNonSequential :: Converting system to Non-Sequential..."
+            )
+        converter = self.TheSystem.Tools.OpenConvertToNSCGroup()
+        converter.ConvertFileToNSC = True
+        converter.IgnoreErrors = bool(ignore_errors)
+        converter.CreateSourcesAndDetectors = bool(create_source_and_detector)
+        converter.ConvertToGlobalCoordinates = bool(convert_global_coordinates)
+        converter.ConvertStopToNSCAperture = bool(convert_stop_to_nsc_aperture)
+        converter.HighFidelityConversion = bool(high_fidelity_conversion)
         if not create_source_and_detector:
-            converter.FirstSurface = _convert_raw_surface_input_(self, first_surface, return_index=True)
+            converter.FirstSurface = _convert_raw_surface_input_(
+                self, first_surface, return_index=True
+            )
             if last_surface is None:
                 last_surface = self.LDE_GetNumberOfSurfaces()
-            converter.FirstSurface = _convert_raw_surface_input_(self, first_surface, return_index=True)
-            converter.LastSurface  = _convert_raw_surface_input_(self, last_surface, return_index=True)
+            converter.FirstSurface = _convert_raw_surface_input_(
+                self, first_surface, return_index=True
+            )
+            converter.LastSurface = _convert_raw_surface_input_(
+                self, last_surface, return_index=True
+            )
         else:
             converter.FirstSurface = 1
-            converter.LastSurface  = self.LDE_GetNumberOfSurfaces()
+            converter.LastSurface = self.LDE_GetNumberOfSurfaces()
         if stop_mechanical_half_width is not None:
-            converter.StopMechanicalHalfWidth   = float(stop_mechanical_half_width)
-            converter.HighFidelityResolution    = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.SampleSizes_Pow2Plus1_X , 'S_{}x{}'.format(int(high_fidelity_resolution), int(high_fidelity_resolution)))
+            converter.StopMechanicalHalfWidth = float(stop_mechanical_half_width)
+            converter.HighFidelityResolution = self._CheckIfStringValidInDir_(
+                self.ZOSAPI.Analysis.SampleSizes_Pow2Plus1_X,
+                f"S_{int(high_fidelity_resolution)}x{int(high_fidelity_resolution)}",
+            )
         converter.RunAndWaitForCompletion()
-        converter.Close();
-        if self._verbose: cp('!@lg!@System_ConvertSequentialToNonSequential :: Done converting system to Non-Sequential.')
+        converter.Close()
+        if self._verbose:
+            cp(
+                "!@lg!@System_ConvertSequentialToNonSequential :: Done converting system to Non-Sequential."
+            )
     else:
-         if self._verbose: cp('!@lg!@System_ConvertSequentialToNonSequential :: System is already Non-Sequential.')
+        if self._verbose:
+            cp(
+                "!@lg!@System_ConvertSequentialToNonSequential :: System is already Non-Sequential."
+            )

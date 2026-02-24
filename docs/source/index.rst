@@ -1,6 +1,8 @@
 skZemax documentation
 =====================
 
+`This code package is functional but still under development`
+
 The skZemax class is essentially just a wrapper around the native ZOS-API stand-alone application provided by Zemax distributions, :ref:`ZOSAPI`.
 
 This wrapper was made because much of the default/example code and methods of the ZOS-API are cumbersome to use or simply do not work as intended.
