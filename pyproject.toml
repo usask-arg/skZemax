@@ -37,6 +37,8 @@ test = ["pytest"]
 
 [tool.setuptools_scm]
 write_to = "src/_version.py"
+version_scheme = "post-release" 
+local_scheme = "no-local-version"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
