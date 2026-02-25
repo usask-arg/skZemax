@@ -18,16 +18,11 @@ The best place for documentation is to open Zemax and click on `Help->ZOS-API Sy
 See the examples in `docs\Examples` which show how to use `skZemaxClass()` to execute some of the examples included with Zemax in `Documents\Zemax\ZOS-API Sample Code\Python`.
 
 ## Installation
-The package can be installed through `conda` with
 
-`conda install -c usask-arg skZemax`
-
-and the latest nightly available version is available through
-
-`conda install -c usask-arg-nightly skZemax`
+`pip install skZemax`
 
 ## Usage
-Documentation can be found at  https://skZemax.readthedocs.io/
+Documentation can be found at https://skZemax.readthedocs.io/
 
 ## License
 This project is licensed under the MIT license
