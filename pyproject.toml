@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [
     { name = "Daniel Letros", email = "daniel.letros@usask.ca" },
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 
 dependencies = [
     "alive-progress>=3.3.0",
