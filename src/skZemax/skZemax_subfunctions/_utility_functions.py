@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import os
 import sys
+from box import Box
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 
@@ -254,14 +255,14 @@ def Utilities_SaveZemaxFileAs(self, in_file_path: str) -> None:
     self.TheSystem.SaveAs(str(in_file_path))
 
 
-def Utilities_GetAllSystemUnits(self) -> dict:
+def Utilities_GetAllSystemUnits(self) -> Box:
     """
     Returns the units the current system is working in.
 
     :return: dict[property] = "units"
-    :rtype: dict
+    :rtype: Box
     """
-    out = {}
+    out = Box({})
     unit_kinds = [
         x for x in dir(self.TheSystem.SystemData.Units) if "get_" in x
     ]  # and 'Prefix' not in x]

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import xarray as xr
+from box import Box
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._LDE_functions import (
@@ -59,7 +60,7 @@ def _Analyses_GetZOSObjectAndSettings_(
 
 def _Analysis_SetZOSObjectSettingsByDict_(
     self,
-    analysis_settings: dict,
+    analysis_settings: dict|Box,
     analysis_settings_obj: ZOSAPI_Analysis_Data_IAS,
     analysis_enum: str,
 ) -> None:
@@ -68,7 +69,7 @@ def _Analysis_SetZOSObjectSettingsByDict_(
     This is done by making, configuring, and then loading a configuration file. This config file method seems to be the only robust way to configure analysis settings.
 
     :param analysis_settings: A python dictatory to adjust settings of the analysis. Formatted as dict[MODIFYSETTINGS KEYWORD] = str(value), defaults to None
-    :type analysis_settings: dict
+    :type analysis_settings: dict|Box
     :param analysis_settings_obj: Analysis settings object
     :type analysis_settings_obj: ZOSAPI_Analysis_Data_IAS
     :param analysis_enum: the ZOS-API name of the specified analysis
@@ -142,7 +143,7 @@ def Analyses_GetNamesOfAllAnalyses(self, print_to_console: bool = False) -> list
 
 
 def Analyses_RunAnalysesAndGetResults(
-    self, analysis: str, analysis_settings: dict | np.ndarray[int] = None
+    self, analysis: str, analysis_settings: dict | Box | np.ndarray[int] = None
 ) -> ZOSAPI_Analysis_Data_IAR:
     """
     This is a generalized function to run a Zemax analysis on the optical system.

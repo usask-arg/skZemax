@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 import numpy as np
+from box import Box
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
@@ -333,7 +334,7 @@ def NCE_GetObjectColumnEnum(
 
 def NCE_GetAllColumnDataOfObject(
     self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow
-) -> dict:
+) -> Box:
     """
     Gets all column data of a Non-Sequential object and returns it as a dict.
     This was made for robustness, as direct reference calls on NCE objects (i.e. object.property) do not work correctly.
@@ -344,12 +345,12 @@ def NCE_GetAllColumnDataOfObject(
     :param ObjectNCE: The NCE object to change. Can be given as an index or an NCE object.
     :type ObjectNCE: Union[int, ZOSAPI_Editors_NCE_INCERow]
     :return: dict of the NCE object's column data.
-    :rtype: dict
+    :rtype: Box
     """
     objectcolumn_calls, _object_columns = self._NCE_GetObjectCellCalls_(
         self._convert_raw_obj_input_(ObjectNCE, return_index=False)
     )
-    out = {}
+    out = Box({})
     for ocall in objectcolumn_calls:
         if "(unused)" in ocall.Header and "Par 0" not in ocall.Header:
             break  # Everything after this should be empty
@@ -361,7 +362,7 @@ def NCE_GetAllColumnDataOfObject(
 
 
 def NCE_SetAllColumnDataOfObjectFromDict(
-    self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow, ObjectNCE_dict: dict
+    self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow, ObjectNCE_dict: dict|Box
 ) -> None:
     """
     Sets all column data of a Non-Sequential object from a dict.
@@ -373,7 +374,7 @@ def NCE_SetAllColumnDataOfObjectFromDict(
     :param ObjectNCE: The NCE object to change. Can be given as an index or an NCE object.
     :type ObjectNCE: Union[int, ZOSAPI_Editors_NCE_INCERow]
     :param ObjectNCE_dict: dict of column data and values. Expected to be the same format as the output of invoking :func:`NCE_GetAllColumnDataOfObject` on the same object.
-    :type ObjectNCE_dict: dict
+    :type ObjectNCE_dict: dict|Box
     """
     objectcolumn_calls, _object_columns = self._NCE_GetObjectCellCalls_(
         self._convert_raw_obj_input_(ObjectNCE, return_index=False)
@@ -424,7 +425,7 @@ def NCE_GetObjectRotationAndPositionMatrices(
     return None, None
 
 
-def NCE_ReadZDRFile(self, in_ZDR_abs_path: str, should_print: bool = False) -> dict:
+def NCE_ReadZDRFile(self, in_ZDR_abs_path: str, should_print: bool = False) -> Box:
     """
     A NCE utility function which reads a ZDR file and stores it as a dictionary.
 
@@ -433,7 +434,7 @@ def NCE_ReadZDRFile(self, in_ZDR_abs_path: str, should_print: bool = False) -> d
     :param should_print: If True will print the result to console, defaults to False
     :type should_print: bool, optional
     :return: dict of the ray trace structured as dict[Ray_#][Segment_#] with other relevant info in each section.
-    :rtype: dict
+    :rtype: Box
     """
     ZRDReader = self.TheSystem.Tools.OpenRayDatabaseReader()
     ZRDReader.ZRDFile = os.path.abspath(in_ZDR_abs_path)
@@ -448,7 +449,7 @@ def NCE_ReadZDRFile(self, in_ZDR_abs_path: str, should_print: bool = False) -> d
         )
     # This rest is yucky, but I don't see how to make it better.....
     ZRDResult = ZRDReader.GetResults()
-    out_dict = {}
+    out_dict = Box({})
     success_NextResult, rayNumber, waveIndex, wlUM, numSegments = (
         ZRDResult.ReadNextResult()
     )

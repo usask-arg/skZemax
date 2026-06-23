@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 import xarray as xr
+from box import Box
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._field_functions import Field_GetNormalization
@@ -16,6 +17,7 @@ from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
     _convert_raw_input_worker_,
     _ctype_to_numpy_,
 )
+
 
 type ZOSAPI_Editors_LDE_ILDERow = object  # <- ZOSAPI.Editors.LDE.ILDERow # The actual module is referenced by the base PythonStandaloneApplication class.
 type ZOSAPI_Editors_LDE_ISurfaceApertureType = object  # <- ZOSAPI.Editors.LDE.ISurfaceApertureType # The actual module is referenced by the base PythonStandaloneApplication class.
@@ -295,7 +297,7 @@ def LDE_ChangeApertureToRectangular(
 
 def LDE_GetApertureAsRectangularType(
     self, in_Surface: int | ZOSAPI_Editors_LDE_ILDERow
-) -> dict:
+) -> Box:
     """
     This function returns the aperture settings of this object interpreted as a Rectangular aperture by Zemax.
     Note that this does not nesscarly mean the aperture is currently set to be Rectangular, but rather these are the current settings it would have if it were.
@@ -304,13 +306,13 @@ def LDE_GetApertureAsRectangularType(
     :param in_Surface: The surface to change as an object or as an index.
     :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
     :return: A dict of the Rectangular aperture settings
-    :rtype: dict
+    :rtype: Box
     """
     SurfaceLDE = self._convert_raw_surface_input_(in_Surface, return_index=False)
     settings = self.LDE_GetApertureTypeSettings(
         in_Surface=SurfaceLDE, aperture_type="RectangularAperture"
     )
-    out = {}
+    out = Box({})
     out["XHalfWidth"] = settings._S_RectangularAperture.XHalfWidth
     out["YHalfWidth"] = settings._S_RectangularAperture.YHalfWidth
     out["ApertureXDecenter"] = settings._S_RectangularAperture.ApertureXDecenter
@@ -360,7 +362,7 @@ def LDE_ChangeApertureToCircular(
 
 def LDE_GetApertureAsCircularType(
     self, in_Surface: int | ZOSAPI_Editors_LDE_ILDERow
-) -> dict:
+) -> Box:
     """
     This function returns the aperture settings of this object interpreted as a Circular aperture by Zemax.
     Note that this does not nesscarly mean the aperture is currently set to be Circular, but rather these are the current settings it would have if it were.
@@ -369,13 +371,13 @@ def LDE_GetApertureAsCircularType(
     :param in_Surface: The surface to change as an object or as an index.
     :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
     :return: A dict of the Circular aperture settings
-    :rtype: dict
+    :rtype: Box
     """
     SurfaceLDE = self._convert_raw_surface_input_(in_Surface, return_index=False)
     settings = self.LDE_GetApertureTypeSettings(
         in_Surface=SurfaceLDE, aperture_type="CircularAperture"
     )
-    out = {}
+    out = Box({})
     out["MinimumRadius"] = settings._S_CircularAperture.MinimumRadius
     out["MaximumRadius"] = settings._S_CircularAperture.MaximumRadius
     out["ApertureXDecenter"] = settings._S_CircularAperture.ApertureXDecenter
@@ -425,7 +427,7 @@ def LDE_ChangeApertureToCircularObscuration(
 
 def LDE_GetApertureAsCircularObscurationType(
     self, in_Surface: int | ZOSAPI_Editors_LDE_ILDERow
-) -> dict:
+) -> Box:
     """
     This function returns the aperture settings of this object interpreted as a CircularObscuration aperture by Zemax.
     Note that this does not nesscarly mean the aperture is currently set to be CircularObscuration, but rather these are the current settings it would have if it were.
@@ -434,13 +436,13 @@ def LDE_GetApertureAsCircularObscurationType(
     :param in_Surface: The surface to change as an object or as an index.
     :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
     :return: A dict of the CircularObscuration aperture settings
-    :rtype: dict
+    :rtype: Box
     """
     SurfaceLDE = self._convert_raw_surface_input_(in_Surface, return_index=False)
     settings = self.LDE_GetApertureTypeSettings(
         in_Surface=SurfaceLDE, aperture_type="CircularObscuration"
     )
-    out = {}
+    out = Box({})
     out["MinimumRadius"] = settings._S_CircularObscuration.MinimumRadius
     out["MaximumRadius"] = settings._S_CircularObscuration.MaximumRadius
     out["ApertureXDecenter"] = settings._S_CircularObscuration.ApertureXDecenter
@@ -613,7 +615,7 @@ def LDE_GetSurfaceColumnEnum(
 
 def LDE_GetAllColumnDataOfSurface(
     self, in_Surface: int | ZOSAPI_Editors_LDE_ILDERow
-) -> dict:
+) -> Box:
     """
     Gets all column data of a Sequential surface and returns it as a dict.
 
@@ -627,13 +629,13 @@ def LDE_GetAllColumnDataOfSurface(
     :param in_Surface: The surface to change as an object or as an index.
     :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
     :return: dict of the surface's column data.
-    :rtype: dict
+    :rtype: Box
     """
 
     surfacecolumn_calls, _surface_columns = self._LDE_GetSurfaceCalls_(
         self._convert_raw_surface_input_(in_Surface, return_index=False)
     )
-    out = {}
+    out = Box({})
     for scall in surfacecolumn_calls:
         if "(unused)" in scall.Header and "Par 0" not in scall.Header:
             break  # Everything after this should be empty
@@ -645,7 +647,7 @@ def LDE_GetAllColumnDataOfSurface(
 
 
 def LDE_SetAllColumnDataOfSurfaceFromDict(
-    self, in_Surface: int | ZOSAPI_Editors_LDE_ILDERow, SurfaceLDE_dict: dict
+    self, in_Surface: int | ZOSAPI_Editors_LDE_ILDERow, SurfaceLDE_dict: dict|Box
 ) -> None:
     """
     Sets all column data of a Sequential surface from a dict - usually the dict produced by :func:`LDE_GetAllColumnDataOfSurface` after being altered.
@@ -660,7 +662,7 @@ def LDE_SetAllColumnDataOfSurfaceFromDict(
     :param in_Surface: The surface to change as an object or as an index.
     :type in_Surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
     :param SurfaceLDE_dict: Column properties and values to set for the surface.
-    :type SurfaceLDE_dict: dict
+    :type SurfaceLDE_dict: dict|Box
     """
     surfacecolumn_calls, _surface_columns = self._LDE_GetSurfaceCalls_(
         self._convert_raw_surface_input_(in_Surface, return_index=False)

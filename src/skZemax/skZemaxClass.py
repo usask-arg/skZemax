@@ -252,6 +252,27 @@ class skZemaxClass(PythonStandaloneApplication):
 if __name__ == "__main__":
     import numpy as np
 
+    from box import Box
+
+    # Create a Box (dict-like object)
+    config = Box({
+        "host": "localhost",
+        "port": 8080,
+        "debug": True,
+        "database": {
+            "user": "admin",
+            "password": "secret"
+        }
+    })
+
+    # Access like attributes
+    print(config.host)          # localhost
+    print(config.database.user) # admin
+
+    # Still behaves like a dict
+    print(config["port"])       # 8080
+
+
     skZemax = skZemaxClass()
     # skZemax.Utilities_OpenZemaxFile(skZemax.SamplesDir() + os.sep + r'Non-sequential\Miscellaneous\Digital_projector_flys_eye_homogenizer.zmx', False)
     # skZemax.Utilities_OpenZemaxFile(skZemax.Utilities_skZemaxExampleDir() + os.sep + r'e01_new_file_and_quickfocus.zmx', False)

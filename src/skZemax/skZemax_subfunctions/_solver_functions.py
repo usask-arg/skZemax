@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from box import Box
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
@@ -139,7 +140,7 @@ def Solver_GetNamesOfAllSolveTypes(
     self,
     print_to_console: bool = False,
     in_surface: int | ZOSAPI_Editors_LDE_ILDERow = None,
-) -> list | dict[list]:
+) -> list | dict[list] | Box[list]:
     """
     This function builds a list of all the solve type settings in Zemax.
     This can be useful to look up what one may want to code as input to functions like :func:`Solver_LDESurfaceProperty_ForValue`.
@@ -168,7 +169,7 @@ def Solver_GetNamesOfAllSolveTypes(
         saved_verbose_state = bool(self._verbose)
         self._verbose = False
         # Make the output dict
-        out = {}
+        out = Box({})
         # Look up the solvers - and param configurations - for the given surface
         in_surface = self._convert_raw_surface_input_(in_surface, return_index=False)
         surf_props = list(self.LDE_GetAllColumnDataOfSurface(in_surface).keys())
@@ -184,7 +185,7 @@ def Solver_GetNamesOfAllSolveTypes(
         )
         with alive_bar(manual=True) as bar:
             for solve in solve_types:
-                out[solve] = {}
+                out[solve] = Box({})
                 for prop in surf_props:
                     cell_solve_data = in_surface.GetCellAt(
                         int(self.LDE_GetSurfaceColumnEnum(prop, in_surface))
@@ -243,7 +244,7 @@ def Solver_LDESurfaceProperty_ForValue(
     in_surface: int | ZOSAPI_Editors_LDE_ILDERow,
     property: str | int,
     solve_type: str,
-    params: dict,
+    params: dict|Box,
 ):
     """
     Solves the property of the surface for a the parameters of the solve type.
@@ -259,7 +260,7 @@ def Solver_LDESurfaceProperty_ForValue(
     :param solve_type: the solve type to use. See output of :func:`Solver_GetNamesOfAllSolveTypes` with in_surface=None.
     :type solve_type: str
     :param params: The dict of params should have the properties and values for this solve. See :func:`Solver_GetNamesOfAllSolveTypes` with in_surface=in_surface.
-    :type params: dict
+    :type params: dict|Box
     """
     in_surface = self._convert_raw_surface_input_(in_surface, return_index=False)
     # Get 'property' cell, i.e. RadiusCell or ThicknessCell, etc
@@ -320,7 +321,7 @@ def Solver_MCEMakeConfigOp_ForValue(
     in_op: int | ZOSAPI_Editors_MCE_IMCERow,
     config_number: int,
     solve_type: str,
-    params: dict,
+    params: dict|Box,
 ) -> ZOSAPI_Editors_MCE_IMCERow:
     """
     Sets the property property of the ZOSAPI_Editors_MCE_IMCERow (MCE operand) for the configuration number to a solve for value.
@@ -335,7 +336,7 @@ def Solver_MCEMakeConfigOp_ForValue(
     :param solve_type: the solve type to use.
     :type value: str
     :param params: The dict of params should have the properties and values for this solve.
-    :type params: dict
+    :type params: dict|Box
 
     :return: The MCR operand object.
     :rtype: ZOSAPI_Editors_MCE_IMCERow

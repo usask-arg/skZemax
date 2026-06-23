@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from box import Box
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
@@ -8,6 +9,7 @@ from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
     _convert_raw_input_worker_,
     _SetAttrByStringIfValid_,
 )
+
 
 type ZOSAPI_SystemData_IField = object  # <- ZOSAPI.SystemData.IField # The actual module is referenced by the base PythonStandaloneApplication class.
 
@@ -87,17 +89,17 @@ def Fields_AddField(
     )
 
 
-def Field_GetAllDataOfField(self, in_field: int | ZOSAPI_SystemData_IField) -> dict:
+def Field_GetAllDataOfField(self, in_field: int | ZOSAPI_SystemData_IField) -> Box:
     """
     Gets all column data of a Field object and returns it as a dict.
 
     :param in_field: The Field - either the index or the object.
     :type in_field: Union[int, ZOSAPI_SystemData_IField]
-    :return: dict of all Field's properties
-    :rtype: dict
+    :return: Box of all Field's properties
+    :rtype: Box
     """
     field_obj = self._convert_raw_field_input_(in_field, return_index=False)
-    out = {}
+    out = Box({})
     for key in __LowLevelZemaxStringCheck__(
         self,
         self.ZOSAPI.SystemData.FieldColumn,
@@ -113,7 +115,7 @@ def Field_GetAllDataOfField(self, in_field: int | ZOSAPI_SystemData_IField) -> d
 
 
 def Field_SetAllDataOfFieldFromDict(
-    self, in_field: int | ZOSAPI_SystemData_IField, Field_dict: dict
+    self, in_field: int | ZOSAPI_SystemData_IField, Field_dict: dict|Box
 ) -> None:
     """
     Sets all column data of a Field object and returns it as a dict.
@@ -121,7 +123,7 @@ def Field_SetAllDataOfFieldFromDict(
     :param in_field: The Field - either the index or the object.
     :type in_field: Union[int, ZOSAPI_SystemData_IField]
     :param Field_dict: dict of Field properties to set (i.e. :func:`Field_GetDataOfField`)
-    :type Field_dict: dict
+    :type Field_dict: dict|Box
     """
     field_obj = self._convert_raw_field_input_(in_field, return_index=False)
     for key in Field_dict:
