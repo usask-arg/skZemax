@@ -182,7 +182,8 @@ class skZemaxClass(PythonStandaloneApplication):
         Solver_LocalOptimization,
         Solver_MCEMakeConfigOp_ForValue,
         Solver_MCEMakeConfigOpVariable,
-        Solver_QuickFocus_SpotSize,
+        Solver_QuickFocus,
+        Solver_QuickAdjust,
     )
     from skZemax.skZemax_subfunctions._system_functions import (
         System_AddMaterialCatalog,

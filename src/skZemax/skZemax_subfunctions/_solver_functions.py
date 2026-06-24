@@ -5,7 +5,7 @@ from box import Box
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
-    __LowLevelZemaxStringCheck__,
+    __LowLevelZemaxStringCheck__, _CheckIfStringValidInDir_
 )
 
 type ZOSAPI_Editors_LDE_ILDERow = object  # <- ZOSAPI.Editors.LDE.ILDERow # The actual module is referenced by the base PythonStandaloneApplication class.
@@ -15,15 +15,42 @@ type ZOSAPI_Editors_MCE_IMCERow = object  # <- ZOSAPI.Editors.MCE.IMCERow # The 
 ######################################################
 # Optimization Functions
 ######################################################
-def Solver_QuickFocus_SpotSize(self) -> None:
-    """
-    Invokes the Zemax QuickFocus to optimize for the radial spot size.
+def Solver_QuickFocus(self, criterion:str="SpotSizeRadial", use_centroid:bool=True) -> None:
+    """Invokes the Zemax QuickFocus optimization. This adjusts the back focal distance for best focus.
+
+    :param criterion: criterion for the focus. Options are: SpotSizeRadial, SpotSizeXOnly, SpotSizeYOnly, RMSWavefront. Defaults to "SpotSizeRadial"
+    :type criterion: str, optional
+    :param use_centroid: If should use the centroid. Reference all calculations to the image centroid rather than the chief ray. This option is slightly slower, but more appropriate for systems dominated by coma. Defaults to True
+    :type use_centroid: bool, optional
     """
     quickFocus = self.TheSystem.Tools.OpenQuickFocus()
-    quickFocus.Criterion = self.ZOSAPI.Tools.General.QuickFocusCriterion.SpotSizeRadial
-    quickFocus.UseCentroid = True
+    quickFocus.Criterion = self._CheckIfStringValidInDir_(self.ZOSAPI.Tools.General.QuickFocusCriterion, criterion)
+    quickFocus.UseCentroid = use_centroid
     quickFocus.RunAndWaitForCompletion()
     quickFocus.Close()
+
+def Solver_QuickAdjust(self, adjust_surface: int | ZOSAPI_Editors_LDE_ILDERow, evaluate_surface: int | ZOSAPI_Editors_LDE_ILDERow, criterion:str="SpotSizeRadial", optimize_thickness:bool=True) -> None:
+    """Invokes the Zemax QuickAdjust optimization. Similar to :func:`Solver_QuickFocus` but adjusts any radius or thickness to achieve best transverse or angular ray focus evaluated at any subsequent surface.
+
+    :param adjust_surface: The surface to adjust in the optimization.
+    :type adjust_surface: int | ZOSAPI_Editors_LDE_ILDERow
+    :param evaluate_surface:  Selects the surface at which to evaluate the criterion. Note the criterion is evaluated after refraction into the specified surface for angular criterion
+    :type evaluate_surface: int | ZOSAPI_Editors_LDE_ILDERow
+    :param criterion: criterion for the adjustment. All criterion use the image centroid for a reference. Options are: SpotSizeRadial, SpotSizeXOnly, AngularRadial, AngularXOnly, AngularYOnly. Defaults to "SpotSizeRadial"
+    :type criterion: str, optional
+    :param optimize_thickness: Quick adjust can only optimize either the radius or the thickness of the adjust_surface. If this is true the thickness is optimized, else it is the radius. Defaults to True (surface thickness property)
+    :type optimize_thickness: bool, optional
+    """
+    quickAdjust                 = self.TheSystem.Tools.OpenQuickAdjust()
+    quickAdjust.AdjustSurface   = self._convert_raw_surface_input_(adjust_surface, return_index=True)
+    quickAdjust.EvaluateSurface = self._convert_raw_surface_input_(evaluate_surface, return_index=True)
+    quickAdjust.Criterion       = self._CheckIfStringValidInDir_(self.ZOSAPI.Tools.General.QuickAdjustCriterion, criterion)
+    if optimize_thickness:
+        quickAdjust.SurfaceParameter = self._CheckIfStringValidInDir_(self.ZOSAPI.Tools.General.QuickAdjustType, "Thickness")
+    else:
+        quickAdjust.SurfaceParameter = self._CheckIfStringValidInDir_(self.ZOSAPI.Tools.General.QuickAdjustType, "Radius")
+    quickAdjust.RunAndWaitForCompletion()
+    quickAdjust.Close()
 
 
 def Solver_LocalOptimization(
