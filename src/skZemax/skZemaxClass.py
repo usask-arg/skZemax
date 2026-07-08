@@ -232,13 +232,19 @@ class skZemaxClass(PythonStandaloneApplication):
     )
     from skZemax.skZemax_subfunctions._wavelength_functions import (
         Wavelength_AddWavelength,
+        Wavelength_SelectWavelengthPreset,
         Wavelength_GetNamesOfAllPresets,
         Wavelength_GetNumberOfWavelengths,
-        Wavelength_GetPrimaryWavelength,
+        Wavelength_GetAllSystemWavelengthsAsMicrometers,
+        Wavelength_GetAllSystemWavelengthsWeights,
         Wavelength_GetWavelength,
+        Wavelength_GetWavelengthByMicrometers,
         Wavelength_RemoveWavelength,
-        Wavelength_SelectWavelengthPreset,
+        Wavelength_RemoveWavelengthByMicrometers,
+        Wavelength_RemoveAllButPrimaryWavelength,
         Wavelength_SetPrimaryWavelength,
+        Wavelength_GetPrimaryWavelength,
+        Wavelength_GetPrimaryWavelengthAsMicrometers,
         _convert_raw_wavelength_input_,
     )
     from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
@@ -263,7 +269,7 @@ if __name__ == "__main__":
     )
     ray_trace = skZemax.LDE_RunRayTrace(
         ray_trace_rays=skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(
-            Hx=np.array([0]), Hy=np.array([0]), Px=np.array([0.0]), Py=np.array([0.0]), wavelengths=None, should_meshgrid=False,
+            Hx=np.array([0]), Hy=np.array([0]), Px=np.array([0.0]), Py=np.array([0.0]), wavelengths=None
         )
     )
     # ray_trace = skZemax.LDE_RunRayTrace(skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(Hx=np.array([0]),

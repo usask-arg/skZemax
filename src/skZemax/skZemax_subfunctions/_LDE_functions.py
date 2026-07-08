@@ -860,16 +860,14 @@ def LDE_GetObjectRotationAndPositionMatrices(
 def LDE_RunRayTrace(self, ray_trace_rays: xr.Dataset = None) -> xr.Dataset:
     """
     This funcion executes a sequential ray trace.
-    There are differnt definitions for a seqeutnal ray trace:
+    There are differnt definitions for a sequential ray trace:
 
         - Normalized Unpolarized (NormUnpol)
         - Direct Unpolarized (DirectUnpol)
         - Normalized Polarized (NormPol)
         - Direct Polarized (DirectPol)
 
-    The normalized/direct distinction consdiers
-
-    according to settings/values given in an xarray.
+    The type of sequential ray trace which will be selected is determined by the 
 
     :param ray_trace_rays: Infromation of rays which should be traced, defaults to None (will use :func:`LDE_BuildRayTraceNormalizedUnpolarizedRays` as default)
     :type ray_trace_rays: xr.Dataset, optional
@@ -900,14 +898,18 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
     Py: np.ndarray = np.sin(np.linspace(0, 2 * np.pi, 25, endpoint=False)),
     ending_surface: int | ZOSAPI_Editors_LDE_ILDERow = None,
     do_all_surfaces_to_ending: bool = True,
+    primary_wavelength: int
+    | float
+    | ZOSAPI_SystemData_IWavelength = None,
     wavelengths: int
+    | float
     | ZOSAPI_SystemData_IWavelength
-    | list[int, ZOSAPI_SystemData_IWavelength]
-    | np.ndarray[int, ZOSAPI_SystemData_IWavelength] = None,
-    trace_wavelengths_individually: bool = True,
+    | list[int, float, ZOSAPI_SystemData_IWavelength]
+    | np.ndarray[int, float, ZOSAPI_SystemData_IWavelength] = None,
     ray_type: str = "Real",
     OPD_mode: str = "None",
-    should_meshgrid:bool = True
+    should_meshgrid_Hxy:bool = False,
+    should_meshgrid_Pxy:bool = True
 ) -> xr.Dataset:
     """
     This function sets up custom `unpolarized` rays in Zemax's `normalized` coordiante system.
@@ -974,6 +976,10 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
 
         `CurrentAndChief`: will first compute the chief ray, and then calculate the OPD for the current ray.
 
+    NOTE: Since Zemax does not support more than 24 wavelengths at once, the primary wavelength will be assigned as the first wavelength of the system and this function - along 
+          with running the ray trace itself (:func:`_run_NormUnPol_raytrace_`) - will alter the wavelengths of the system file. All wavelengths given here will be traced in batches
+          as large as 24 (inlcuding the primary wavelength). The iniital wavelength settings of the file will be reset for you afterwards (within :func:`_run_NormUnPol_raytrace_`).
+
     :param Hx: An array of Hx points, defaults to np.array([0])
     :type Hx: np.ndarray, optional
     :param Hy: An array of Hy points, defaults to np.array([0])
@@ -986,16 +992,18 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
     :type ending_surface: Union[int, ZOSAPI_Editors_LDE_ILDERow], optional
     :param do_all_surfaces_to_ending: If True will do ray trace for all surfaces up-to the ending one, else will only do the ending, defaults to True
     :type do_all_surfaces_to_ending: bool, optional
-    :param wavelengths: Wavelength(s) of the system to trace (object or as an index). Recommended to have len(wavelengths)<=24 for speed. If more are needed, repeat this in blocks of 24, defaults to None (takes primary wavelength)
-    :type wavelengths: Union[int, ZOSAPI_SystemData_IWavelength, list[int, ZOSAPI_SystemData_IWavelength], np.ndarray[int, ZOSAPI_SystemData_IWavelength]], optional
-    :param trace_wavelengths_individually: If True will trace each wavelength individually, else will trace the aggregate, defaults to True
-    :type trace_wavelengths_individually: bool, optional
+    :param primary_wavelength: Primary wavelength of the system to trace (object, index, or micrometers), defaults to None (takes whatever the current primary wavelength of the system is.)
+    :type primary_wavelength: Union[int, float, ZOSAPI_SystemData_IWavelength], optional
+    :param wavelengths: Wavelength(s) of the system to trace (object, index, or micrometers), defaults to None (takes primary wavelength).
+    :type wavelengths: Union[int, float, ZOSAPI_SystemData_IWavelength, list[int, float, ZOSAPI_SystemData_IWavelength], np.ndarray[int, float, ZOSAPI_SystemData_IWavelength]], optional
     :param ray_type: Type of ray tracing to do. Options are "Real" or "Paraxial". "Paraxial" applies small angle approximations to snell's law for speed where "Real" does not, defaults to "Real"
     :type ray_type: str, optional
     :param OPD_mode: The type of OPD scheme to apply (see desciprtion above), defaults to 'None'
     :type OPD_mode: str, optional
-    :param should_meshgrid: If True a ray for every Hx and Hy pair will be made for every pair of Px and Py, else the Hx, Hy, Px, and Py arrays will be taken directly, defaults to True
-    :type should_meshgrid: bool, optional
+    :param should_meshgrid_Hxy: If True the two arrays of Hx and Hy will be used with np.meshgrid, else the two arrays will be taken as is to define the Hx and Hy points, defaults to False
+    :type should_meshgrid_Hxy: bool, optional
+    :param should_meshgrid_Pxy: If True the two arrays of Px and Py will be used with np.meshgrid, else the two arrays will be taken as is to define the Px and Py points, defaults to True
+    :type should_meshgrid_Pxy: bool, optional
     :return: An xarray of rays ready to be traced by :func:`LDE_RunRayTrace`
     :rtype: xr.Dataset
     """
@@ -1005,24 +1013,36 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
         ending_surface = self._convert_raw_surface_input_(
             ending_surface, return_index=True
         )
-    if wavelengths is None:
-        wavelengths_idx = np.array(
-            [self.Wavelength_GetPrimaryWavelength().WavelengthNumber]
-        )
-    else:
+    # Configure the wavelnegths in batches of up to 24. the primary wavelength needs to be in each batch.
+    if primary_wavelength is None:
+        primary_wavelength = self.Wavelength_GetPrimaryWavelengthAsMicrometers()
+    # Store initial wavelengths
+    initial_system_wavelengths_um           = self.Wavelength_GetAllSystemWavelengthsAsMicrometers()
+    initial_system_weights                  = self.Wavelength_GetAllSystemWavelengthsWeights()
+    initial_system_primary_wavelength_um    = self.Wavelength_GetPrimaryWavelengthAsMicrometers()
+    # Enforce new primary in the first index.
+    self.Wavelength_RemoveAllButPrimaryWavelength()
+    self.Wavelength_AddWavelength(primary_wavelength, 1.0)
+    self.Wavelength_SetPrimaryWavelength(2)
+    self.Wavelength_RemoveAllButPrimaryWavelength()
+    # Sort out the wavelengths and their indices in batches. The primary wavelength will always be the first wavelength in the
+    # wavelenth array. The wavelengths will be broken into batches with lens of [24, <=23, ..., <=23].
+    # This is because the primary wavelength must always be in the system and will be the 24th wavelenegth of all chuncks following the first.
+    # However, we will not store the same information of the primary wavelength multipule times.
+    if wavelengths is not None:
         if not isinstance(wavelengths, np.ndarray) and not isinstance(
             wavelengths, list
         ):
             wavelengths = np.array([wavelengths])
-        wavelengths_idx = np.array(
-            [
-                _convert_raw_wavelength_input_(self, x, return_index=True)
-                for x in wavelengths
-            ]
-        )
-    wavelengths_um = np.array(
-        [self.Wavelength_GetWavelength(x).Wavelength for x in wavelengths_idx]
-    )
+        wavelengths_sorted = np.concat([np.array([primary_wavelength]), np.sort(wavelengths[wavelengths!=primary_wavelength])])
+    else:
+        wavelengths_sorted = np.array([primary_wavelength])
+    chuncked_wavelengths_um = [wavelengths_sorted[0:24]]
+    if len(wavelengths_sorted)>24:
+        chuncked_wavelengths_um += [wavelengths_sorted[i:i+23] for i in range(24, len(wavelengths_sorted), 23)]
+    # chuncked_wavelengths_idx     = [np.arange(2, len(x)+2, 1) for x in chuncked_wavelengths_um]
+    # chuncked_wavelengths_idx[0]  = np.insert(chuncked_wavelengths_idx[0], 0, 1)[0:-1] # incorperate the primary wavelength in the first batch
+    chunck_idx = [np.ones_like(x)*idx for idx, x in enumerate(chuncked_wavelengths_um)]
     def _check_bounds_(in_hx, in_hy, in_px, in_py):
         in_hx = in_hx[np.abs(in_hx) <= 1]
         in_hy = in_hy[np.abs(in_hy) <= 1]
@@ -1037,20 +1057,21 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
         in_px = in_px[radius <= 1]
         in_py = in_py[radius <= 1]
         return in_hx, in_hy, in_px, in_py
-    if should_meshgrid:
+    if should_meshgrid_Hxy:
         HX, HY = np.meshgrid(Hx, Hy)
-        PX, PY = np.meshgrid(Px, Py)
-        HX, HY, PX, PY = _check_bounds_(HX, HY, PX, PY)
-        HXarray   = np.repeat(HX, PX.shape[0]).astype(float)
-        HYarray   = np.repeat(HY, PX.shape[0]).astype(float)
-        PXarray   = np.tile(PX, HX.shape[0]).astype(float)
-        PYarray   = np.tile(PY, HX.shape[0]).astype(float)
     else:
-        Hx, Hy, Px, Py = _check_bounds_(Hx, Hy, Px, Py)
-        HXarray   = Hx.astype(float)
-        HYarray   = Hy.astype(float)
-        PXarray   = Px.astype(float)
-        PYarray   = Py.astype(float)
+        HX = np.atleast_2d(Hx)
+        HY = np.atleast_2d(Hy)
+    if should_meshgrid_Pxy:
+        PX, PY = np.meshgrid(Px, Py)
+    else:
+        PX = np.atleast_2d(Px)
+        PY = np.atleast_2d(Py)
+    HX, HY, PX, PY = _check_bounds_(HX, HY, PX, PY)
+    HXarray   = np.repeat(HX, PX.shape[0]).astype(float)
+    HYarray   = np.repeat(HY, PX.shape[0]).astype(float)
+    PXarray   = np.tile(PX, HX.shape[0]).astype(float)
+    PYarray   = np.tile(PY, HX.shape[0]).astype(float)
     return xr.Dataset(
         {
             "Hx": ("ray", HXarray),
@@ -1059,14 +1080,17 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
             "Py": ("ray", PYarray),
         },
         coords={
-            "wavelengths_um": ("wvln", wavelengths_um.astype(float)),
-            "wavelengths_idx": ("wvln", wavelengths_idx.astype(int)),
+            "wavelengths_um": ("wvln", np.hstack(chuncked_wavelengths_um).astype(float)),
+            "ray_traceing_chunk_idx": ("wvln", np.hstack(chunck_idx).astype(int)),
         },
         attrs={
             "ray_trace_type": "NormUnpol",
-            "ending_surface": str(int(ending_surface)),
-            "do_all_surfaces_to_ending": str(int(do_all_surfaces_to_ending)),
-            "trace_wavelengths_individually": str(int(trace_wavelengths_individually)),
+            "ending_surface": int(ending_surface),
+            "do_all_surfaces_to_ending": int(do_all_surfaces_to_ending),
+            "initial_system_wavelengths_um": initial_system_wavelengths_um.astype(float),
+            "initial_system_weights": initial_system_weights.astype(float),
+            "initial_system_primary_wavelength_um": float(initial_system_primary_wavelength_um),
+            "ray_traced_primary_wavelength_um": float(primary_wavelength),
             "ray_type": str(
                 _CheckIfStringValidInDir_(
                     self, self.ZOSAPI.Tools.RayTrace.RaysType, ray_type
@@ -1091,6 +1115,9 @@ def _run_NormUnPol_raytrace_(
     Executes a Normalized Un-polarized Raytrace. This function is expected to be called only by :func:`LDE_RunRayTrace`.
     This particular worker function should be selected by the 'ray_trace_type' property in the xarray of rays to be traced.
 
+    TODO: I think there is a bug in what Zemax returns through the RayTrae.dll. The X/Y/Z normals of the very last (image) surface are wrong and should 
+          probably be the same of the surface before(?). This is a probalem if only traceing the last surface and not the whole system. Solution TBD.
+
     :param opened_batch_ray_trace: The opened batch ray trace tool (output of self.TheSystem.Tools.OpenBatchRayTrace())
     :type opened_batch_ray_trace: ZOSAPI_Tools_RayTrace_IBatchRayTrace
     :param desired_ray_trace_call: A callback to the ray interface object, in this case this should be the CreateNormUnpol() function.
@@ -1098,24 +1125,22 @@ def _run_NormUnPol_raytrace_(
     :param ray_trace_rays:  Infromation of rays which should be traced. In this case, an xarray formatted as :func:`LDE_BuildRayTraceNormalizedUnpolarizedRays` does.
     :type ray_trace_rays: xr.Dataset
     """
+    # Append properties to the ray_trace_rays xarray.
     if bool(int(ray_trace_rays.attrs["do_all_surfaces_to_ending"])):
         surfaces_to_trace = np.arange(
             0, int(ray_trace_rays.attrs["ending_surface"]) + 1
         )
     else:
         surfaces_to_trace = np.array([int(ray_trace_rays.attrs["ending_surface"])])
-    if bool(int(ray_trace_rays.attrs["trace_wavelengths_individually"])):
-        dims = "('wvln', 'surf', 'ray')"
-        blank_rays = np.zeros(
-            (
-                ray_trace_rays.wavelengths_idx.shape[0],
-                surfaces_to_trace.shape[0],
-                ray_trace_rays.ray.shape[0],
-            )
+
+    dims = "('wvln', 'surf', 'ray')"
+    blank_rays = np.zeros(
+        (
+            ray_trace_rays.wavelengths_um.shape[0],
+            surfaces_to_trace.shape[0],
+            ray_trace_rays.ray.shape[0],
         )
-    else:
-        dims = "('surf', 'ray')"
-        blank_rays = np.zeros((surfaces_to_trace.shape[0], ray_trace_rays.ray.shape[0]))
+    )
 
     ray_trace_rays = ray_trace_rays.assign_coords(
         {"surf": (("surf"), surfaces_to_trace.astype(int))}
@@ -1124,7 +1149,7 @@ def _run_NormUnPol_raytrace_(
         {"error": (eval(dims), blank_rays.astype(bool))}
     )
     ray_trace_rays = ray_trace_rays.assign(
-        {"vignette": (eval(dims), blank_rays.astype(bool))}
+        {"vignette": (eval(dims), blank_rays.astype(int))}
     )
     ray_trace_rays = ray_trace_rays.assign(
         {"X": (eval(dims), blank_rays.astype(float))}
@@ -1192,11 +1217,40 @@ def _run_NormUnPol_raytrace_(
             )
         }
     )
-    if not bool(int(ray_trace_rays.attrs["trace_wavelengths_individually"])):
-        # We are not looking at each wavelength by itself.
+    # The public class ReadNormUnpolData within BatchRayTrace.dll seems a little buggy after inspection.
+    # One line in InitializeOutput does: maxSegments = (maxSegments) * (maxSegments);
+    # I see absoltly no reason for this and think it is just a stright bug.
+    # Also, within ReadNextBlock there is this:
+    # int maxSeg = output.MaxSegments;
+    # int incrementer = 0;
+    # bool full = false;
+    # while (!full)
+    # {
+    #     if (incrementer > maxSeg)
+    #     {
+    #         break;
+    #     }
+    # and incrementer indexes things like output.X[incrementer] = X; - which are indexed from zero.
+    # So if incrementer == maxSeg then it will try to index outside of the buffer.
+    # To account for all this I allocated (number of rays)*(number of wavelengths)*(number of surfaces)*BUFFER FACTOR and sqrt the value, and round up.
+    BUFFER = int(np.ceil(np.sqrt(int(ray_trace_rays.ending_surface)*ray_trace_rays.wvln.shape[0]*ray_trace_rays.ray.shape[0]*1.2)))
+    # Ensure primary wavelength is configured in the system. This should be the same um as the very first wavelength in ray_trace_rays.
+    self.Wavelength_RemoveAllButPrimaryWavelength()
+    self.Wavelength_AddWavelength(float(ray_trace_rays.ray_traced_primary_wavelength_um))
+    self.Wavelength_SetPrimaryWavelength(2)
+    for chunk_idx in list(set(ray_trace_rays.ray_traceing_chunk_idx.values)):
+        # Now set the wavelengths of the ray trace by chunk (since Zemax can only support 23 + the primary)
+        self.Wavelength_RemoveAllButPrimaryWavelength()
+        if ray_trace_rays.wavelengths_um.shape[0] > 1:
+            if chunk_idx == 0:
+                [self.Wavelength_AddWavelength(x) for x in ray_trace_rays.sel(ray_traceing_chunk_idx=chunk_idx).wavelengths_um[1::]]
+            else:
+                [self.Wavelength_AddWavelength(x) for x in ray_trace_rays.sel(ray_traceing_chunk_idx=chunk_idx).wavelengths_um]
+        wi = ray_trace_rays.ray_traceing_chunk_idx.values == chunk_idx
+        number_of_wavelengths_in_chunk = self.Wavelength_GetNumberOfWavelengths()
         for surf_idx, surf in enumerate(surfaces_to_trace):
             ray_tracer = desired_ray_trace_call(
-                ray_trace_rays.ray.shape[0],
+                ray_trace_rays.ray.shape[0]*number_of_wavelengths_in_chunk,
                 _CheckIfStringValidInDir_(
                     self,
                     self.ZOSAPI.Tools.RayTrace.RaysType,
@@ -1208,9 +1262,9 @@ def _run_NormUnPol_raytrace_(
                 opened_batch_ray_trace, ray_tracer
             )
             dataReader.ClearData()
-            for wvlenidx in ray_trace_rays.wavelengths_idx.values:
+            for wvlenidx in range(self.Wavelength_GetNumberOfWavelengths()):
                 dataReader.AddRay(
-                    int(wvlenidx),
+                    int(wvlenidx+1),
                     ray_trace_rays.Hx.values,
                     ray_trace_rays.Hy.values,
                     ray_trace_rays.Px.values,
@@ -1221,206 +1275,118 @@ def _run_NormUnPol_raytrace_(
                         ray_trace_rays.attrs["OPD_mode"],
                     ),
                 )
-            rayData = dataReader.InitializeOutput(ray_trace_rays.ray.shape[0])
+            rayData = dataReader.InitializeOutput(BUFFER)
             isFinished = False
             totalSegRead = 0
+            def _reshape_chunk_(in_chunk_values:np.ndarray):
+                if chunk_idx == 0:
+                    return in_chunk_values.reshape(number_of_wavelengths_in_chunk, -1)
+                else:
+                    # don't return the primary wavelength
+                    return in_chunk_values.reshape(number_of_wavelengths_in_chunk, -1)[1::,:]
             while not isFinished and rayData is not None:
                 readSegments = dataReader.ReadNextBlock(rayData)
                 if readSegments == 0:
                     isFinished = True
                 else:
                     totalSegRead = totalSegRead + readSegments
-                    ray_trace_rays.error.values[surf_idx, :] = _ctype_to_numpy_(
+                    ray_trace_rays.error.values[wi, surf_idx, :] = _reshape_chunk_(_ctype_to_numpy_(
                         self,
                         rayData.errorCode,
                         data_length=readSegments,
                         data_type=np.int32,
-                    ).astype(bool)
-                    ray_trace_rays.vignette.values[surf_idx, :] = _ctype_to_numpy_(
+                    ).astype(bool))
+                    ray_trace_rays.vignette.values[wi, surf_idx, :] =_reshape_chunk_(_ctype_to_numpy_(
+                            self,
+                            rayData.vignetteCode,
+                            data_length=readSegments,
+                            data_type=np.int32,
+                        ).astype(int))
+                    ray_trace_rays.X.values[wi, surf_idx, :] = _reshape_chunk_(_ctype_to_numpy_(
                         self,
-                        rayData.errorCode,
-                        data_length=readSegments,
-                        data_type=np.int32,
-                    ).astype(bool)
-                    ray_trace_rays.X.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.X, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.Y.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.Y, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.Z.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.Z, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.Xcosine.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.L, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.Ycosine.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.M, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.Zcosine.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.N, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.Xnormal.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.l2, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.Ynormal.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.m2, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.Znormal.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.n2, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.OPD.values[surf_idx, :] = _ctype_to_numpy_(
-                        self, rayData.opd, data_length=readSegments, data_type=np.double
-                    )
-                    ray_trace_rays.intensity.values[surf_idx, :] = _ctype_to_numpy_(
-                        self,
-                        rayData.intensity,
+                        rayData.X,
                         data_length=readSegments,
                         data_type=np.double,
+                    ))
+                    ray_trace_rays.Y.values[wi, surf_idx, :] = _reshape_chunk_(_ctype_to_numpy_(
+                        self,
+                        rayData.Y,
+                        data_length=readSegments,
+                        data_type=np.double,
+                    ))
+                    ray_trace_rays.Z.values[wi, surf_idx, :] = _reshape_chunk_(_ctype_to_numpy_(
+                        self,
+                        rayData.Z,
+                        data_length=readSegments,
+                        data_type=np.double,
+                    ))
+                    ray_trace_rays.Xcosine.values[wi, surf_idx, :] = (
+                        _reshape_chunk_(_ctype_to_numpy_(
+                            self,
+                            rayData.L,
+                            data_length=readSegments,
+                            data_type=np.double,
+                        ))
+                    )
+                    ray_trace_rays.Ycosine.values[wi, surf_idx, :] = (
+                        _reshape_chunk_(_ctype_to_numpy_(
+                            self,
+                            rayData.M,
+                            data_length=readSegments,
+                            data_type=np.double,
+                        ))
+                    )
+                    ray_trace_rays.Zcosine.values[wi, surf_idx, :] = (
+                        _reshape_chunk_(_ctype_to_numpy_(
+                            self,
+                            rayData.N,
+                            data_length=readSegments,
+                            data_type=np.double,
+                        ))
+                    )
+                    ray_trace_rays.Xnormal.values[wi, surf_idx, :] = (
+                        _reshape_chunk_(_ctype_to_numpy_(
+                            self,
+                            rayData.l2,
+                            data_length=readSegments,
+                            data_type=np.double,
+                        ))
+                    )
+                    ray_trace_rays.Ynormal.values[wi, surf_idx, :] = (
+                        _reshape_chunk_(_ctype_to_numpy_(
+                            self,
+                            rayData.m2,
+                            data_length=readSegments,
+                            data_type=np.double,
+                        ))
+                    )
+                    ray_trace_rays.Znormal.values[wi, surf_idx, :] = (
+                        _reshape_chunk_(_ctype_to_numpy_(
+                            self,
+                            rayData.n2,
+                            data_length=readSegments,
+                            data_type=np.double,
+                        ))
+                    )
+                    ray_trace_rays.OPD.values[wi, surf_idx, :] = _reshape_chunk_(_ctype_to_numpy_(
+                        self,
+                        rayData.opd,
+                        data_length=readSegments,
+                        data_type=np.double,
+                    ))
+                    ray_trace_rays.intensity.values[wi, surf_idx, :] = (
+                        _reshape_chunk_(_ctype_to_numpy_(
+                            self,
+                            rayData.intensity,
+                            data_length=readSegments,
+                            data_type=np.double,
+                        ))
                     )
             dataReader.ClearData()
             del ray_tracer
             ray_tracer = None
             del dataReader
             dataReader = None
-
-    else:
-        # Do each wavelength by itself. Each will now have it's own index.
-        for wi, wvlenidx in enumerate(ray_trace_rays.wavelengths_idx.values):
-            for surf_idx, surf in enumerate(surfaces_to_trace):
-                ray_tracer = desired_ray_trace_call(
-                    ray_trace_rays.ray.shape[0],
-                    _CheckIfStringValidInDir_(
-                        self,
-                        self.ZOSAPI.Tools.RayTrace.RaysType,
-                        ray_trace_rays.attrs["ray_type"],
-                    ),
-                    int(surf),
-                )
-                dataReader = self.BatchRayTrace.ReadNormUnpolData(
-                    opened_batch_ray_trace, ray_tracer
-                )
-                dataReader.ClearData()
-                dataReader.AddRay(
-                    int(wvlenidx),
-                    ray_trace_rays.Hx.values,
-                    ray_trace_rays.Hy.values,
-                    ray_trace_rays.Px.values,
-                    ray_trace_rays.Py.values,
-                    _CheckIfStringValidInDir_(
-                        self,
-                        self.ZOSAPI.Tools.RayTrace.OPDMode,
-                        ray_trace_rays.attrs["OPD_mode"],
-                    ),
-                )
-                rayData = dataReader.InitializeOutput(ray_trace_rays.ray.shape[0])
-                isFinished = False
-                totalSegRead = 0
-                while not isFinished and rayData is not None:
-                    readSegments = dataReader.ReadNextBlock(rayData)
-                    if readSegments == 0:
-                        isFinished = True
-                    else:
-                        totalSegRead = totalSegRead + readSegments
-                        ray_trace_rays.error.values[wi, surf_idx, :] = _ctype_to_numpy_(
-                            self,
-                            rayData.errorCode,
-                            data_length=readSegments,
-                            data_type=np.int32,
-                        ).astype(bool)
-                        ray_trace_rays.vignette.values[wi, surf_idx, :] = (
-                            _ctype_to_numpy_(
-                                self,
-                                rayData.errorCode,
-                                data_length=readSegments,
-                                data_type=np.int32,
-                            ).astype(bool)
-                        )
-                        ray_trace_rays.X.values[wi, surf_idx, :] = _ctype_to_numpy_(
-                            self,
-                            rayData.X,
-                            data_length=readSegments,
-                            data_type=np.double,
-                        )
-                        ray_trace_rays.Y.values[wi, surf_idx, :] = _ctype_to_numpy_(
-                            self,
-                            rayData.Y,
-                            data_length=readSegments,
-                            data_type=np.double,
-                        )
-                        ray_trace_rays.Z.values[wi, surf_idx, :] = _ctype_to_numpy_(
-                            self,
-                            rayData.Z,
-                            data_length=readSegments,
-                            data_type=np.double,
-                        )
-                        ray_trace_rays.Xcosine.values[wi, surf_idx, :] = (
-                            _ctype_to_numpy_(
-                                self,
-                                rayData.L,
-                                data_length=readSegments,
-                                data_type=np.double,
-                            )
-                        )
-                        ray_trace_rays.Ycosine.values[wi, surf_idx, :] = (
-                            _ctype_to_numpy_(
-                                self,
-                                rayData.M,
-                                data_length=readSegments,
-                                data_type=np.double,
-                            )
-                        )
-                        ray_trace_rays.Zcosine.values[wi, surf_idx, :] = (
-                            _ctype_to_numpy_(
-                                self,
-                                rayData.N,
-                                data_length=readSegments,
-                                data_type=np.double,
-                            )
-                        )
-                        ray_trace_rays.Xnormal.values[wi, surf_idx, :] = (
-                            _ctype_to_numpy_(
-                                self,
-                                rayData.l2,
-                                data_length=readSegments,
-                                data_type=np.double,
-                            )
-                        )
-                        ray_trace_rays.Ynormal.values[wi, surf_idx, :] = (
-                            _ctype_to_numpy_(
-                                self,
-                                rayData.m2,
-                                data_length=readSegments,
-                                data_type=np.double,
-                            )
-                        )
-                        ray_trace_rays.Znormal.values[wi, surf_idx, :] = (
-                            _ctype_to_numpy_(
-                                self,
-                                rayData.n2,
-                                data_length=readSegments,
-                                data_type=np.double,
-                            )
-                        )
-                        ray_trace_rays.OPD.values[wi, surf_idx, :] = _ctype_to_numpy_(
-                            self,
-                            rayData.opd,
-                            data_length=readSegments,
-                            data_type=np.double,
-                        )
-                        ray_trace_rays.intensity.values[wi, surf_idx, :] = (
-                            _ctype_to_numpy_(
-                                self,
-                                rayData.intensity,
-                                data_length=readSegments,
-                                data_type=np.double,
-                            )
-                        )
-                dataReader.ClearData()
-                del ray_tracer
-                ray_tracer = None
-                del dataReader
-                dataReader = None
     # Include pupile apodization for intensity
     ray_trace_rays.intensity.values = (
         ray_trace_rays.intensity / ray_trace_rays.pupil_apodization
@@ -1541,11 +1507,14 @@ def _run_NormUnPol_raytrace_(
         )
     ).values
     ray_trace_rays.angle_in.values[np.isnan(ray_trace_rays.angle_in.values)] = 0.0
-    if "wvln" in ray_trace_rays.angle_in.dims:
-        ray_trace_rays.angle_in.values[:, 0, :] = 0.0
-    else:
-        ray_trace_rays.angle_in.values[0, :] = 0.0
-    return ray_trace_rays
+    ray_trace_rays.angle_in.values[:, 0, :] = 0.0
+    # Reset the file's wavelengths and return
+    self.Wavelength_RemoveAllButPrimaryWavelength()
+    self.Wavelength_AddWavelength(float(ray_trace_rays.initial_system_primary_wavelength_um))
+    self.Wavelength_SetPrimaryWavelength(2)
+    self.Wavelength_RemoveAllButPrimaryWavelength()
+    [self.Wavelength_AddWavelength(float(x), float(y)) for x, y in zip(ray_trace_rays.initial_system_wavelengths_um, ray_trace_rays.initial_system_weights) if x != float(ray_trace_rays.initial_system_primary_wavelength_um)]
+    return ray_trace_rays.drop_vars("ray_traceing_chunk_idx")
 
 
 # raytrace = TheSystem.Tools.OpenBatchRayTrace();
