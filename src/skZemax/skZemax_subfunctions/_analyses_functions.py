@@ -613,8 +613,8 @@ def Analyses_FFTMTF(
     {
         "modulation"                : (("field", freq_units, 'ray_type'), mod_y[1::].astype(float)),
         "phase"                     : (("field", freq_units, 'ray_type'), phase_y[1::].astype(float)),
-        "real"                      : (("field", freq_units, 'ray_type'), real_y[1::].astype(float)),
-        "imaginary"                 : (("field", freq_units, 'ray_type'), imag_y[1::].astype(float)),
+        "real_part"                 : (("field", freq_units, 'ray_type'), real_y[1::].astype(float)),
+        "imag_part"                 : (("field", freq_units, 'ray_type'), imag_y[1::].astype(float)),
         "square_wave"               : (("field", freq_units, 'ray_type'), square_y[1::].astype(float)),
         "modulation_diff_limited"   : ((freq_units, 'ray_type'), mod_y[0].astype(float)),
         "phase_diff_limited"        : ((freq_units, 'ray_type'), phase_y[0].astype(float)),
@@ -704,26 +704,21 @@ def Analyses_FFTPSF(
     cp("!@lg!@Analyses_FFTPSF :: Done Calculating FFT PSF.")
     out = xr.Dataset(
     {
-        "modulation"                : (("field", freq_units, 'ray_type'), mod_y[1::].astype(float)),
-        "phase"                     : (("field", freq_units, 'ray_type'), phase_y[1::].astype(float)),
-        "real"                      : (("field", freq_units, 'ray_type'), real_y[1::].astype(float)),
-        "imaginary"                 : (("field", freq_units, 'ray_type'), imag_y[1::].astype(float)),
-        "square_wave"               : (("field", freq_units, 'ray_type'), square_y[1::].astype(float)),
-        "modulation_diff_limited"   : ((freq_units, 'ray_type'), mod_y[0].astype(float)),
-        "phase_diff_limited"        : ((freq_units, 'ray_type'), phase_y[0].astype(float)),
-        "real_diff_limited"         : ((freq_units, 'ray_type'), real_y[0].astype(float)),
-        "imaginary_diff_limited"    : ((freq_units, 'ray_type'), imag_y[0].astype(float)),
-        "square_wave_diff_limited"  : ((freq_units, 'ray_type'), square_y[0].astype(float)),
+        "linear"                : (("y_micrometers", "x_micrometers"), ling.astype(float)),
+        "log"                : (("y_micrometers", "x_micrometers"), logg.astype(float)),
+        "phase"                : (("y_micrometers", "x_micrometers"), phaseg.astype(float)),
+        "real_part"                : (("y_micrometers", "x_micrometers"), realg.astype(float)),
+        "imag_part"                : (("y_micrometers", "x_micrometers"), imagg.astype(float)),
     }, 
     coords={
-        freq_units: (freq_units, freq[0].astype(float),),
-        "field_x": ("field", np.array([x.X for x in fields]).astype(float),),
-        "field_y": ("field", np.array([x.Y for x in fields]).astype(float),),
-        "ray_type": ("ray_type", np.array(['sagittal_periodic_in_object_y', 'tangential_periodic_in_object_x']).astype(str),),
+        "x_micrometers": ("x_micrometers", x.astype(float),),
+        "y_micrometers": ("y_micrometers", y.astype(float),),
     },
     attrs={
-        'Field_Type'    : str(self.Field_GetFieldType()),
-        'Lens_Units'    : str(units["LensUnits"]),
+        'Field_Type'          : str(self.Field_GetFieldType()),
+        'Field_X'             : float(self.Field_GetField(field).X),
+        'Field_Y'             : float(self.Field_GetField(field).Y),
+        'Lens_Units'          : str(units["LensUnits"]),
     }
     )
     return out
