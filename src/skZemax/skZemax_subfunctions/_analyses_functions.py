@@ -12,6 +12,14 @@ from skZemax.skZemax_subfunctions._LDE_functions import (
     ZOSAPI_Editors_LDE_ILDERow,
     _convert_raw_surface_input_,
 )
+from skZemax.skZemax_subfunctions._wavelength_functions import (
+    ZOSAPI_SystemData_IWavelength,
+    _convert_raw_wavelength_input_,
+)
+from skZemax.skZemax_subfunctions._field_functions import (
+    ZOSAPI_SystemData_IField,
+    _convert_raw_field_input_,
+)
 from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
     __LowLevelZemaxStringCheck__,
     _CheckIfStringValidInDir_,
@@ -21,8 +29,53 @@ type ZOSAPI_Analysis_Data_IA = object  # <- ZOSAPI.Analysis.IA_ # The actual mod
 type ZOSAPI_Analysis_Data_IAR = object  # <- ZOSAPI.Analysis.Data.IAR_ # The actual module is referenced by the base PythonStandaloneApplication class.
 type ZOSAPI_Analysis_Data_IAS = object  # <- ZOSAPI.Analysis.Settings.IAS_ # The actual module is referenced by the base PythonStandaloneApplication class.
 
+def _Analysis_GeneralDataSeriesReader_(self, results:ZOSAPI_Analysis_Data_IAR):
+    """Germanized worker for reading X and Y data from data series returned from an analysis GetResults() call.
 
-def _Analyses_GetZOSObjectAndSettings_(
+    :param results: The return of an analysis GetResults() call.
+    :type results: ZOSAPI_Analysis_Data_IAR
+    """
+    xar = []
+    yar = []
+    for seriesNum in range(results.NumberOfDataSeries):
+        data = results.GetDataSeries(seriesNum)
+        xRaw = data.XData.Data
+        yRaw = data.YData.Data
+        xar.append(np.array(tuple(xRaw)))
+        try:
+            yar.append(
+                np.array(
+                    np.asarray(tuple(yRaw)).reshape(
+                        data.YData.Data.GetLength(0), data.YData.Data.GetLength(1)
+                    )
+                )
+            )
+        except Exception:
+            yar.append(np.array(np.asarray(tuple(yRaw))))
+    return np.array(xar), np.array(yar)
+
+def _Analysis_GeneralDataGridReader_(self, results:ZOSAPI_Analysis_Data_IAR):
+    """Germanized worker for reading grid data from data returned from an analysis GetResults() call.
+
+    :param results: The return of an analysis GetResults() call.
+    :type results: ZOSAPI_Analysis_Data_IAR
+    """
+    gar = []
+    xar = []
+    yar = []
+    for gridNum in range(results.NumberOfDataGrids):
+        data = results.GetDataGrid(gridNum)
+        gRaw = data.Values
+        dx = data.Dx
+        dy = data.Dy
+        xmin = data.MinX
+        ymin = data.MinY
+        xar.append(xmin + np.arange(data.Nx) * dx)
+        yar.append(ymin + np.arange(data.Ny) * dy)
+        gar.append(np.array(tuple(gRaw)).reshape(data.Ny, data.Nx))
+    return np.array(gar), np.array(xar), np.array(yar)
+
+def _Analysis_GetZOSObjectAndSettings_(
     self, analysis: str
 ) -> tuple[ZOSAPI_Analysis_Data_IA, ZOSAPI_Analysis_Data_IAS, str]:
     """
@@ -43,7 +96,7 @@ def _Analyses_GetZOSObjectAndSettings_(
     if analysis_obj is None:
         if self._verbose:
             cp(
-                f"!@ly!@_Analyses_GetZOSObjectAndSettings_ :: Analysis [!@lm!@{analysis_enum!s}!@ly!@] is not applicable to [!@lm!@{self.System_GetMode()}!@ly!@] mode."
+                f"!@ly!@_Analysis_GetZOSObjectAndSettings_ :: Analysis [!@lm!@{analysis_enum!s}!@ly!@] is not applicable to [!@lm!@{self.System_GetMode()}!@ly!@] mode."
             )
         return None, None, None
     analysis_settings_obj = analysis_obj.GetSettings()
@@ -52,7 +105,7 @@ def _Analyses_GetZOSObjectAndSettings_(
         analysis_obj = None
         if self._verbose:
             cp(
-                f"!@ly!@_Analyses_GetZOSObjectAndSettings_ :: Analysis [!@lm!@{analysis_enum!s}!@ly!@] is not applicable to [!@lm!@{self.System_GetMode()}!@ly!@] mode."
+                f"!@ly!@_Analysis_GetZOSObjectAndSettings_ :: Analysis [!@lm!@{analysis_enum!s}!@ly!@] is not applicable to [!@lm!@{self.System_GetMode()}!@ly!@] mode."
             )
         return None, None, None
     return analysis_obj, analysis_settings_obj, str(analysis_enum)
@@ -201,7 +254,7 @@ def Analyses_RunAnalysesAndGetResults(
     :rtype: ZOSAPI_Analysis_Data_IAR
     """
     analysis_obj, analysis_settings_obj, analysis_enum = (
-        self._Analyses_GetZOSObjectAndSettings_(analysis=analysis)
+        self._Analysis_GetZOSObjectAndSettings_(analysis=analysis)
     )
     if analysis_obj is None or analysis_settings_obj is None:
         return None
@@ -356,7 +409,7 @@ def Analyses_Footprint(
     as an aggregate of all the wavelengths/fields/configurations being looked at.
 
     Note that this information does not capture any footprint descriptions beyond plotting an ellipse.
-    Any more realistic ray-tracing is lost through the ZOS-API and needs to be examined directly in Zemax.
+    Any more realistic ray-tracing is lost through the ZOS-API and needs to be examined directly in Zemax - or run your own ray trace using functions like :func:`LDE_RunRayTrace`.
 
     This function loops through all fields/wavelengths/configurations individually and records the above information in an xarray for user analysis.
     See :func:`AnalysisPlotting_Footprint`.
@@ -483,92 +536,281 @@ def Analyses_Footprint(
     return out
 
 
+
 def Analyses_FFTMTF(
     self,
-    wavelength_index: int = 0,
-    field_index: int = 0,
-    surface_index: int = 0,
-    MTF_type: str = "mod",
-    sampleSize: str = "256x256",
-    maxFreq: float = 0,
-    ShowDiffractionLimit: bool = True,
-    UseDashes: bool = True,
-    UsePolarization: bool = True,
-) -> tuple[np.ndarray, np.ndarray]:
+    wavelength: int | float | ZOSAPI_SystemData_IWavelength = 0,
+    field: int | ZOSAPI_SystemData_IField = 0,
+    surface: int | ZOSAPI_Editors_LDE_ILDERow = 0,
+    sample_size: str = "256x256",
+    max_freq: float = 0,
+    use_polarization: bool = True,
+) -> xr.Dataset:
     """
-    Get FFTMTF of the system.
+    Get the (sequential) FFT MTF of the system.
 
-    :param wavelength_index: System wavelength index to do the MTF on. 0 is for all wavelengths, Defaults to 0.
-    :type wavelength_index: int, optional
-    :param field_index: System field index to do the MTF on. 0 is for all fields, defaults to 0
-    :type field_index: int, optional
-    :param surface_index: System surface index to do the MTF on. 0 is for image surface, defaults to 0
-    :type surface_index: int, optional
-    :param MTF_type: Type of MTF to report: 'modulation', 'real', 'imaginary', 'phase', 'square wave', defaults to 'mod'
-    :type MTF_type: str, optional
-    :param sampleSize: '1024x1024', '128x128', '16384x16384', '2048x2048', '256x256', '32x32', '4096x4096', '512x512', '64x64', '8192x8192', defaults to '256x256'
-    :type sampleSize: str, optional
-    :param maxFreq: Max frequency of the analysis, 0 to default, defaults to 0
-    :type maxFreq: float, optional
-    :param ShowDiffractionLimit: Include diffraction limited curves, defaults to True
-    :type ShowDiffractionLimit: bool, optional
-    :param UseDashes: Use dashes, defaults to True
-    :type UseDashes: bool, optional
-    :param UsePolarization: Use polarization, defaults to True
-    :type UsePolarization: bool, optional
+    TODO: Support multipule MCE configurations
+
+    :param wavelength: System wavelength (as index, microns, or object) to do the MTF on. An int of 0 selects all all wavelengths, Defaults to 0.
+    :type wavelength: int | float | ZOSAPI_SystemData_IWavelength, optional
+    :param field: System field (index of object) to do the MTF on.  An int of 0 selects all fields, defaults to 0
+    :type field: int | ZOSAPI_SystemData_IField, optional
+    :param surface: System surface (index or object) to do the MTF on. An int of 0 selects the image surface, defaults to 0
+    :type surface: int, optional
+    :param sample_size: '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+    :type sample_size: str, optional
+    :param max_freq: Max frequency of the analysis, 0 allows Zemax to select it, defaults to 0
+    :type max_freq: float, optional
+    :param use_polarization: Use polarization, defaults to True
+    :type use_polarization: bool, optional
     :return: The x and y data of the FFTMTF analysis.
     :rtype: tuple[np.ndarray, np.ndarray]
     """
-    newMTF = self.TheSystem.Analyses.New_FftMtf()
-    # Settings. Example API calls for it do not work. Found a work around through configuration files.
-    # MODIFYSETTINGS are defined in the ZPL help files: The Programming Tab > About the ZPL > Keywords
-    SampSizeIdx = self._CheckIfStringValidInDir_(
-        self.ZOSAPI.Analysis.SampleSizes, sampleSize, extra_include_filter="S_"
-    )
-    TypeIdx = int(
-        self._CheckIfStringValidInDir_(
-            self.ZOSAPI.Analysis.Settings.Mtf.MtfTypes, MTF_type
+    # convert wavelength/fields/surface
+    if not (isinstance(wavelength, int) and wavelength == 0):
+        wavelength = self._convert_raw_wavelength_input_(wavelength, return_index=True)
+    if not (isinstance(field, int) and field == 0):
+        field = self._convert_raw_field_input_(field, return_index=True)
+    if not (isinstance(surface, int) and surface == 0):
+        surface = self._convert_raw_field_input_(surface, return_index=True)
+    def _do_mtf_mode_(MTF_type:str):
+        # Settings. Example API calls for it do not work. Found a work around through configuration files.
+        # MODIFYSETTINGS are defined in the ZPL help files: The Programming Tab > About the ZPL > Keywords
+        SampSizeIdx = self._CheckIfStringValidInDir_(
+            self.ZOSAPI.Analysis.SampleSizes, sample_size, extra_include_filter="S_"
         )
-    )
-    newMTF_Settings = newMTF.GetSettings()
-    cfgFile = self.Utilities_ConfigFilesDir() + os.sep + "FFTMTF.CFG"
-    newMTF_Settings.SaveTo(cfgFile)
-    newMTF_Settings.ModifySettings(cfgFile, "MTF_SAMP", str(int(SampSizeIdx)))
-    newMTF_Settings.ModifySettings(cfgFile, "MTF_WAVE", str(int(wavelength_index)))
-    newMTF_Settings.ModifySettings(cfgFile, "MTF_FIELD", str(int(field_index)))
-    newMTF_Settings.ModifySettings(cfgFile, "MTF_TYPE", str(int(TypeIdx)))
-    newMTF_Settings.ModifySettings(cfgFile, "MTF_SURF", str(int(surface_index)))
-    newMTF_Settings.ModifySettings(
-        cfgFile, "MTF_MAXF", "0" if float(maxFreq) <= 0 else str(float(maxFreq))
-    )
-    newMTF_Settings.ModifySettings(
-        cfgFile, "MTF_SDLI", "1" if ShowDiffractionLimit else "0"
-    )
-    newMTF_Settings.ModifySettings(
-        cfgFile, "MTF_POLAR", "1" if UsePolarization else "0"
-    )
-    newMTF_Settings.ModifySettings(cfgFile, "MTF_DASH", "1" if UseDashes else "0")
-    newMTF_Settings.LoadFrom(cfgFile)
-    # Get
-    cp("!@lg!@Analyses_getFFTMTF :: Calculating FFT MTF...")
-    newMTF.ApplyAndWaitForCompletion()
-    results = newMTF.GetResults()
-    xar = []
-    yar = []
-    for seriesNum in range(results.NumberOfDataSeries):
-        data = results.GetDataSeries(seriesNum)
-        xRaw = data.XData.Data
-        yRaw = data.YData.Data
-        xar.append(np.array(tuple(xRaw)))
-        try:
-            yar.append(
-                np.array(
-                    np.asarray(tuple(yRaw)).reshape(
-                        data.YData.Data.GetLength(0), data.YData.Data.GetLength(1)
-                    )
-                )
+        TypeIdx = int(
+            self._CheckIfStringValidInDir_(
+                self.ZOSAPI.Analysis.Settings.Mtf.MtfTypes, MTF_type
             )
-        except Exception:
-            yar.append(np.array(np.asarray(tuple(yRaw))))
-    cp("!@lg!@Analyses_getFFTMTF :: Done Calculating FFT MTF.")
-    return np.array(xar), np.array(yar)
+        )
+        Settings                = {}
+        Settings['MTF_SAMP']    = str(int(SampSizeIdx))
+        Settings['MTF_WAVE']    = str(int(wavelength))
+        Settings['MTF_FIELD']   = str(int(field))
+        Settings['MTF_TYPE']    = str(int(TypeIdx))
+        Settings['MTF_SURF']    = str(int(surface))
+        Settings['MTF_MAXF']    = "0" if float(max_freq) <= 0 else str(float(max_freq))
+        Settings['MTF_SDLI']    = "1" # Always show diffraction limit
+        Settings['MTF_POLAR']   = "1" if use_polarization else "0"
+        Settings['MTF_DASH']    = "1" # Dash line (for "classic mode" and does not matter here)
+        cp("!@lg!@Analyses_FFTMTF :: Calculating FFT MTF [!@lm!@%s!@lg!@]." % MTF_type)
+        xar, yar = self._Analysis_GeneralDataSeriesReader_(self.Analyses_RunAnalysesAndGetResults(analysis='FftMtf', analysis_settings=Settings))
+        return xar, yar
+    freq, mod_y   = _do_mtf_mode_('modulation')
+    _, phase_y    = _do_mtf_mode_('phase')
+    _, real_y     = _do_mtf_mode_('real')
+    _, imag_y     = _do_mtf_mode_('imaginary')
+    _, square_y   = _do_mtf_mode_('squarewave')
+    if field != 0:
+        fields        = [self.Field_GetField(field)]
+    else:
+        fields        = [self.Field_GetField(x+1) for x in range(self.Fields_GetNumberOfFields())]
+    units         = self.Utilities_GetAllSystemUnits()
+    freq_units    = str(units["MTFUnits"])
+    cp("!@lg!@Analyses_FFTMTF :: Done Calculating FFT MTF.")
+    out = xr.Dataset(
+    {
+        "modulation"                : (("field", freq_units, 'ray_type'), mod_y[1::].astype(float)),
+        "phase"                     : (("field", freq_units, 'ray_type'), phase_y[1::].astype(float)),
+        "real"                      : (("field", freq_units, 'ray_type'), real_y[1::].astype(float)),
+        "imaginary"                 : (("field", freq_units, 'ray_type'), imag_y[1::].astype(float)),
+        "square_wave"               : (("field", freq_units, 'ray_type'), square_y[1::].astype(float)),
+        "modulation_diff_limited"   : ((freq_units, 'ray_type'), mod_y[0].astype(float)),
+        "phase_diff_limited"        : ((freq_units, 'ray_type'), phase_y[0].astype(float)),
+        "real_diff_limited"         : ((freq_units, 'ray_type'), real_y[0].astype(float)),
+        "imaginary_diff_limited"    : ((freq_units, 'ray_type'), imag_y[0].astype(float)),
+        "square_wave_diff_limited"  : ((freq_units, 'ray_type'), square_y[0].astype(float)),
+    }, 
+    coords={
+        freq_units: (freq_units, freq[0].astype(float),),
+        "field_x": ("field", np.array([x.X for x in fields]).astype(float),),
+        "field_y": ("field", np.array([x.Y for x in fields]).astype(float),),
+        "ray_type": ("ray_type", np.array(['sagittal_periodic_in_object_y', 'tangential_periodic_in_object_x']).astype(str),),
+    },
+    attrs={
+        'Field_Type'    : str(self.Field_GetFieldType()),
+        'Lens_Units'    : str(units["LensUnits"]),
+    }
+    )
+    return out
+
+def Analyses_FFTPSF(
+    self,
+    wavelength: int | float | ZOSAPI_SystemData_IWavelength = 0,
+    field: int | ZOSAPI_SystemData_IField = 1,
+    surface: int | ZOSAPI_Editors_LDE_ILDERow = 0,
+    sample_size: str = "256x256",
+    output_size: str = "512x512",
+    image_delta_microns:int|float=0,
+    use_polarization: bool = True,
+    use_normalization: bool = True,
+) -> xr.Dataset:
+    """
+    Get the (sequential) FFT MTF of the system.
+
+    TODO: Support multipule MCE configurations
+
+    :param wavelength: System wavelength (as index, microns, or object) to do the MTF on. An int of 0 selects all all wavelengths, Defaults to 0.
+    :type wavelength: int | float | ZOSAPI_SystemData_IWavelength, optional
+    :param field: System field (index of object) to do the MTF on.  An int of 0 selects all fields, defaults to 0
+    :type field: int | ZOSAPI_SystemData_IField, optional
+    :param surface: System surface (index or object) to do the MTF on. An int of 0 selects the image surface, defaults to 0
+    :type surface: int, optional
+    :param sample_size: Sampling of the PSF calulation. '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+    :type sample_size: str, optional
+    :param output_size: Size of the output grid (for display). '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '512x512'
+    :type output_size: str, optional
+    :param image_delta_microns: The distance in micrometers between points in the image grid. Use zero for the default grid spacing, defaults to 0
+    :type image_delta: int|float, optional
+    :param use_polarization: Use polarization, defaults to True
+    :type use_polarization: bool, optional
+    :param use_normalization: If should normalize the PSF or not, defaults to True
+    :type use_normalization: bool, optional
+    :return: The x and y data of the FFTMTF analysis.
+    :rtype: tuple[np.ndarray, np.ndarray]
+    """
+    # convert wavelength/fields/surface
+    if not (isinstance(wavelength, int) and wavelength == 0):
+        wavelength = self._convert_raw_wavelength_input_(wavelength, return_index=True)
+    field = self._convert_raw_field_input_(field, return_index=True)
+    if not (isinstance(surface, int) and surface == 0):
+        surface = self._convert_raw_field_input_(surface, return_index=True)
+    def _do_psf_mode_(PSF_type:str):
+        # "OutputSize" is not docummented or seemignly accessable through what :func:`Analyses_RunAnalysesAndGetResults` would do.
+        # This actually seems to be build on a "newer" version of the Zemax settings API which is much less abstractable it seems.
+        # Doing manual assignmnet below through the use of `analysis_settings_obj.__implementation__`.
+        analysis_obj, analysis_settings_obj, analysis_enum    = self._Analysis_GetZOSObjectAndSettings_(analysis='FftPsf')
+        analysis_settings_obj                                 = analysis_settings_obj.__implementation__
+        analysis_settings_obj.SampleSize                      = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.Psf.PsfSampling, sample_size, extra_include_filter="S_")
+        analysis_settings_obj.OutputSize                      = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.Psf.PsfSampling, output_size, extra_include_filter="S_")
+        analysis_settings_obj.Wavelength.SetWavelengthNumber(int(wavelength))
+        analysis_settings_obj.Field.SetFieldNumber(int(field))
+        analysis_settings_obj.Type                            = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.Psf.FftPsfType, PSF_type)
+        analysis_settings_obj.Surface.SetSurfaceNumber(int(surface))
+        analysis_settings_obj.UsePolarization                 = use_polarization
+        analysis_settings_obj.Normalize                       = use_normalization
+        analysis_settings_obj.ImageDelta                      = float(image_delta_microns)
+        cp("!@lg!@Analyses_FFTPSF :: Calculating FFT PSF [!@lm!@%s!@lg!@]..." % PSF_type)  
+        analysis_obj.ApplyAndWaitForCompletion()
+        gar, xar, yar = self._Analysis_GeneralDataGridReader_(analysis_obj.GetResults())
+        return gar[0], xar[0], yar[0]
+    ling, x, y   = _do_psf_mode_('linear')
+    logg, _, _   = _do_psf_mode_('log')
+    phaseg, _, _   = _do_psf_mode_('phase')
+    realg, _, _   = _do_psf_mode_('real')
+    imagg, _, _   = _do_psf_mode_('imaginary')
+    units         = self.Utilities_GetAllSystemUnits()
+    cp("!@lg!@Analyses_FFTPSF :: Done Calculating FFT PSF.")
+    out = xr.Dataset(
+    {
+        "modulation"                : (("field", freq_units, 'ray_type'), mod_y[1::].astype(float)),
+        "phase"                     : (("field", freq_units, 'ray_type'), phase_y[1::].astype(float)),
+        "real"                      : (("field", freq_units, 'ray_type'), real_y[1::].astype(float)),
+        "imaginary"                 : (("field", freq_units, 'ray_type'), imag_y[1::].astype(float)),
+        "square_wave"               : (("field", freq_units, 'ray_type'), square_y[1::].astype(float)),
+        "modulation_diff_limited"   : ((freq_units, 'ray_type'), mod_y[0].astype(float)),
+        "phase_diff_limited"        : ((freq_units, 'ray_type'), phase_y[0].astype(float)),
+        "real_diff_limited"         : ((freq_units, 'ray_type'), real_y[0].astype(float)),
+        "imaginary_diff_limited"    : ((freq_units, 'ray_type'), imag_y[0].astype(float)),
+        "square_wave_diff_limited"  : ((freq_units, 'ray_type'), square_y[0].astype(float)),
+    }, 
+    coords={
+        freq_units: (freq_units, freq[0].astype(float),),
+        "field_x": ("field", np.array([x.X for x in fields]).astype(float),),
+        "field_y": ("field", np.array([x.Y for x in fields]).astype(float),),
+        "ray_type": ("ray_type", np.array(['sagittal_periodic_in_object_y', 'tangential_periodic_in_object_x']).astype(str),),
+    },
+    attrs={
+        'Field_Type'    : str(self.Field_GetFieldType()),
+        'Lens_Units'    : str(units["LensUnits"]),
+    }
+    )
+    return out
+
+
+def Analyses_HuygensMTF(
+    self,
+    wavelength: int | float | ZOSAPI_SystemData_IWavelength = 0,
+    field: int | ZOSAPI_SystemData_IField = 0,
+    pupil_sample_size: str = "256x256",
+    image_sample_size: str = "256x256",
+    image_delta_microns:int|float=0,
+    max_freq: float = 0,
+    use_polarization: bool = True,
+) -> xr.Dataset:
+    """
+    Get the Huygens MTF of the system.
+
+    TODO: Support multipule MCE configurations
+    
+    :param wavelength: System wavelength (as index, microns, or object) to do the MTF on. An int of 0 selects all all wavelengths, Defaults to 0.
+    :type wavelength: int | float | ZOSAPI_SystemData_IWavelength, optional
+    :param field: System field (index of object) to do the MTF on.  An int of 0 selects all fields, defaults to 0
+    :type field: int | ZOSAPI_SystemData_IField, optional
+    :param pupil_sample_size:  Selects the size of the grid of rays to trace to perform the computation. Higher sampling densities yield more accurate results at the expense of longer computation times.
+                               '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+    :type pupil_sample_size: str, optional
+    :param image_sample_size: The size of the grid of points on which to compute the diffraction image intensity. This number, combined with the image delta, determine the size of the area displayed. 
+                              '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+    :type image_sample_size: str, optional
+    :param image_delta_microns: The distance in micrometers between points in the image grid. Use zero for the default grid spacing, defaults to 0
+    :type image_delta: int|float, optional
+    :param max_freq: Max frequency of the analysis, 0 allows Zemax to select it, defaults to 0
+    :type max_freq: float, optional
+    :param use_polarization: Use polarization, defaults to True
+    :type use_polarization: bool, optional
+    :return: The x and y data of the FFTMTF analysis.
+    :rtype: tuple[np.ndarray, np.ndarray]
+    """
+    # Code wise this is just an adapt of the FFT MTF
+    # convert wavelength/fields/surface
+    if not (isinstance(wavelength, int) and wavelength == 0):
+        wavelength = self._convert_raw_wavelength_input_(wavelength, return_index=True)
+    if not (isinstance(field, int) and field == 0):
+        field = self._convert_raw_field_input_(field, return_index=True)
+    PupilSampSizeIdx = self._CheckIfStringValidInDir_(
+        self.ZOSAPI.Analysis.SampleSizes, pupil_sample_size, extra_include_filter="S_"
+    )
+    ImageSampSizeIdx = self._CheckIfStringValidInDir_(
+        self.ZOSAPI.Analysis.SampleSizes, image_sample_size, extra_include_filter="S_"
+    )
+    Settings                    = {}
+    Settings['HMF_PUPILSAMP']   = str(int(PupilSampSizeIdx))
+    Settings['HMF_IMAGESAMP']   = str(int(ImageSampSizeIdx))
+    if np.isclose(image_delta_microns, 0.0):
+        Settings['HMF_IMAGEDELTA']    = str(int(0))
+    else:
+        Settings['HMF_IMAGEDELTA']    = str(float(image_delta_microns))
+    Settings['HMF_CONFIG']    = str(int(0)) # TODO support configurations
+    Settings['HMF_WAVE']      = str(int(wavelength))
+    Settings['HMF_FIELD']     = str(int(field))
+    Settings['HMF_TYPE']      = str(int(0)) # Only mode 0 = Modulation is supported by Zemax for Huygens
+    Settings['HMF_MAXF']      = "0" if float(max_freq) <= 0 else str(float(max_freq))
+    Settings['HMF_POLAR']     = "1" if use_polarization else "0"
+    Settings['HMF_DASH']      = "1"
+    freq, mod_y = self._Analysis_GeneralDataSeriesReader_(self.Analyses_RunAnalysesAndGetResults(analysis='HuygensMtf', analysis_settings=Settings))
+    if field != 0:
+        fields        = [self.Field_GetField(field)]
+    else:
+        fields        = [self.Field_GetField(x+1) for x in range(self.Fields_GetNumberOfFields())]
+    units         = self.Utilities_GetAllSystemUnits()
+    freq_units    = str(units["MTFUnits"])
+    out = xr.Dataset(
+    {
+        "modulation"                : (("field", freq_units, 'ray_type'), mod_y.astype(float)),
+    }, 
+    coords={
+        freq_units: (freq_units, freq[0].astype(float),),
+        "field_x": ("field", np.array([x.X for x in fields]).astype(float),),
+        "field_y": ("field", np.array([x.Y for x in fields]).astype(float),),
+        "ray_type": ("ray_type", np.array(['sagittal_periodic_in_image_y', 'tangential_periodic_in_image_x']).astype(str),),
+    },
+    attrs={
+        'Field_Type'    : str(self.Field_GetFieldType()),
+        'Lens_Units'    : str(units["LensUnits"]),
+    }
+    )
+    return out
+
+

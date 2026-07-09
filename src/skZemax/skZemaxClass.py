@@ -44,18 +44,20 @@ class skZemaxClass(PythonStandaloneApplication):
     from skZemax.skZemax_subfunctions._analyses_functions import (
         Analyses_ExtractSectionOfTextFile,
         Analyses_FFTMTF,
+        Analyses_FFTPSF,
+        Analyses_HuygensMTF,
         Analyses_Footprint,
         Analyses_GetNamesOfAllAnalyses,
         Analyses_ReportSurfacePrescription,
         Analyses_ReportSystemPrescription,
         Analyses_RunAnalysesAndGetResults,
-        _Analyses_GetZOSObjectAndSettings_,
+        _Analysis_GeneralDataSeriesReader_,
+        _Analysis_GeneralDataGridReader_,
+        _Analysis_GetZOSObjectAndSettings_,
         _Analysis_SetZOSObjectSettingsByBinaryAlteration_,
         _Analysis_SetZOSObjectSettingsByDict_,
     )
     from skZemax.skZemax_subfunctions._analyses_plotting_functions import (
-        AnalysesPlotting_FFTMTF,
-        AnalysesPlotting_LinePlotByField,
         AnalysisPlotting_Footprint,
     )
     from skZemax.skZemax_subfunctions._CAD_functions import (
@@ -257,30 +259,7 @@ class skZemaxClass(PythonStandaloneApplication):
 
 
 if __name__ == "__main__":
-    import numpy as np
-    
-    skZemax = skZemaxClass()
-    # skZemax.Utilities_OpenZemaxFile(skZemax.SamplesDir() + os.sep + r'Non-sequential\Miscellaneous\Digital_projector_flys_eye_homogenizer.zmx', False)
-    # skZemax.Utilities_OpenZemaxFile(skZemax.Utilities_skZemaxExampleDir() + os.sep + r'e01_new_file_and_quickfocus.zmx', False)
-    skZemax.Utilities_MainProgramDir()
-    skZemax.Utilities_OpenZemaxFile(
-        r"E:\_OfficerRepositories\ZemaxRepos\skzemax_show\src\skZemax_SHOW\skSHS_end_to_end_files\BVI\Front_End\SHOW_FrontEnd_V15_stockLenses_2025_02_02.zmx",
-        False,
-    )
-    ray_trace = skZemax.LDE_RunRayTrace(
-        ray_trace_rays=skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(
-            Hx=np.array([0]), Hy=np.array([0]), Px=np.array([0.0]), Py=np.array([0.0]), wavelengths=None
-        )
-    )
-    # ray_trace = skZemax.LDE_RunRayTrace(skZemax.LDE_BuildRayTraceNormalizedUnpolarizedRays(Hx=np.array([0]),
-    #                                            Hy=np.array([0]),
-    #                                            Px=np.cos(np.linspace(0, 2 * np.pi, 150, endpoint=False)),
-    #                                            Py=np.sin(np.linspace(0, 2 * np.pi, 150, endpoint=False)), do_all_surfaces_to_ending=False))
-    ray_trace.sel(surf=30).reset_coords("wavelengths_idx", drop=True).plot.scatter(
-        x="X", y="Y"
-    )
-    import matplotlib.pyplot as plt
-    plt.show()
+    skZemax_obj = skZemaxClass()
     # Close
-    del skZemax
-    skZemax = None
+    del skZemax_obj
+    skZemax_obj = None
