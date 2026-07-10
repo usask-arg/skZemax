@@ -545,11 +545,10 @@ def Analyses_FFTMTF(
     sample_size: str = "256x256",
     max_freq: float = 0,
     use_polarization: bool = True,
+    configuration:int=None,
 ) -> xr.Dataset:
     """
     Get the (sequential) FFT MTF of the system.
-
-    TODO: Support multipule MCE configurations
 
     :param wavelength: System wavelength (as index, microns, or object) to do the MTF on. An int of 0 selects all all wavelengths, Defaults to 0.
     :type wavelength: int | float | ZOSAPI_SystemData_IWavelength, optional
@@ -563,9 +562,16 @@ def Analyses_FFTMTF(
     :type max_freq: float, optional
     :param use_polarization: Use polarization, defaults to True
     :type use_polarization: bool, optional
+    :param configuration: MCE configration to perform the analysis on. If None will use the active configuration, defaults to None.
+    :type configuration: bool, optional
     :return: The x and y data of the FFTMTF analysis.
     :rtype: tuple[np.ndarray, np.ndarray]
     """
+    CURRENT_CONFIG = int(self.MCE_GetCurrentConfig())
+    if configuration is None:
+        self.MCE_SetActiveConfig(CURRENT_CONFIG)
+    else:
+        self.MCE_SetActiveConfig(configuration)
     # convert wavelength/fields/surface
     if not (isinstance(wavelength, int) and wavelength == 0):
         wavelength = self._convert_raw_wavelength_input_(wavelength, return_index=True)
@@ -629,10 +635,12 @@ def Analyses_FFTMTF(
         "ray_type": ("ray_type", np.array(['sagittal_periodic_in_object_y', 'tangential_periodic_in_object_x']).astype(str),),
     },
     attrs={
-        'Field_Type'    : str(self.Field_GetFieldType()),
-        'Lens_Units'    : str(units["LensUnits"]),
+        'Field_Type'        : str(self.Field_GetFieldType()),
+        'Lens_Units'        : str(units["LensUnits"]),
+        'MCE_Configuration' : int(self.MCE_GetCurrentConfig()),
     }
     )
+    self.MCE_SetActiveConfig(CURRENT_CONFIG)
     return out
 
 def Analyses_FFTPSF(
@@ -645,11 +653,10 @@ def Analyses_FFTPSF(
     image_delta_microns:int|float=0,
     use_polarization: bool = True,
     use_normalization: bool = True,
+    configuration:int=None,
 ) -> xr.Dataset:
     """
-    Get the (sequential) FFT MTF of the system.
-
-    TODO: Support multipule MCE configurations
+    Get the (sequential) FFT PSF of the system.
 
     :param wavelength: System wavelength (as index, microns, or object) to do the MTF on. An int of 0 selects all all wavelengths, Defaults to 0.
     :type wavelength: int | float | ZOSAPI_SystemData_IWavelength, optional
@@ -667,9 +674,16 @@ def Analyses_FFTPSF(
     :type use_polarization: bool, optional
     :param use_normalization: If should normalize the PSF or not, defaults to True
     :type use_normalization: bool, optional
+    :param configuration: MCE configration to perform the analysis on. If None will use the active configuration, defaults to None.
+    :type configuration: bool, optional
     :return: The x and y data of the FFTMTF analysis.
     :rtype: tuple[np.ndarray, np.ndarray]
     """
+    CURRENT_CONFIG = int(self.MCE_GetCurrentConfig())
+    if configuration is None:
+        self.MCE_SetActiveConfig(CURRENT_CONFIG)
+    else:
+        self.MCE_SetActiveConfig(configuration)
     # convert wavelength/fields/surface
     if not (isinstance(wavelength, int) and wavelength == 0):
         wavelength = self._convert_raw_wavelength_input_(wavelength, return_index=True)
@@ -693,13 +707,19 @@ def Analyses_FFTPSF(
         analysis_settings_obj.ImageDelta                      = float(image_delta_microns)
         cp("!@lg!@Analyses_FFTPSF :: Calculating FFT PSF [!@lm!@%s!@lg!@]..." % PSF_type)  
         analysis_obj.ApplyAndWaitForCompletion()
-        gar, xar, yar = self._Analysis_GeneralDataGridReader_(analysis_obj.GetResults())
-        return gar[0], xar[0], yar[0]
-    ling, x, y   = _do_psf_mode_('linear')
-    logg, _, _   = _do_psf_mode_('log')
-    phaseg, _, _   = _do_psf_mode_('phase')
-    realg, _, _   = _do_psf_mode_('real')
-    imagg, _, _   = _do_psf_mode_('imaginary')
+        results = analysis_obj.GetResults()
+        results.GetTextFile(self.Utilities_AnalysesFilesDir() + os.sep + "HuygensPSF.txt")
+        info = self.Analyses_ExtractSectionOfTextFile(
+            in_file=self.Utilities_AnalysesFilesDir() + os.sep + "HuygensPSF.txt",
+            start_marker="Date",
+            end_marker="Values")
+        gar, xar, yar = self._Analysis_GeneralDataGridReader_(results)
+        return gar[0], xar[0], yar[0], info
+    ling, x, y, info   = _do_psf_mode_('linear')
+    logg, _, _, _   = _do_psf_mode_('log')
+    phaseg, _, _, _   = _do_psf_mode_('phase')
+    realg, _, _, _   = _do_psf_mode_('real')
+    imagg, _, _, _   = _do_psf_mode_('imaginary')
     units         = self.Utilities_GetAllSystemUnits()
     cp("!@lg!@Analyses_FFTPSF :: Done Calculating FFT PSF.")
     out = xr.Dataset(
@@ -719,8 +739,14 @@ def Analyses_FFTPSF(
         'Field_X'             : float(self.Field_GetField(field).X),
         'Field_Y'             : float(self.Field_GetField(field).Y),
         'Lens_Units'          : str(units["LensUnits"]),
+        'Data_Spacing'        : str(info[2].split('is')[-1].strip(' ').strip('.')),
+        'Pupil_Grid'        : str(info[6].split(':')[-1].strip(' ').strip('.')),
+        'Image_Grid'        : str(info[7].split(':')[-1].strip(' ').strip('.')),
+        'Center_Point'        : [x.split(' ')[-1].strip(' ').strip(',')  for x in info[8].split(':')[-1].strip(' ').strip('.').split(', ')],
+        'MCE_Configuration'   : int(self.MCE_GetCurrentConfig()),
     }
     )
+    self.MCE_SetActiveConfig(CURRENT_CONFIG)
     return out
 
 
@@ -733,11 +759,10 @@ def Analyses_HuygensMTF(
     image_delta_microns:int|float=0,
     max_freq: float = 0,
     use_polarization: bool = True,
+    configuration:int=None,
 ) -> xr.Dataset:
     """
     Get the Huygens MTF of the system.
-
-    TODO: Support multipule MCE configurations
     
     :param wavelength: System wavelength (as index, microns, or object) to do the MTF on. An int of 0 selects all all wavelengths, Defaults to 0.
     :type wavelength: int | float | ZOSAPI_SystemData_IWavelength, optional
@@ -755,9 +780,16 @@ def Analyses_HuygensMTF(
     :type max_freq: float, optional
     :param use_polarization: Use polarization, defaults to True
     :type use_polarization: bool, optional
+    :param configuration: MCE configration to perform the analysis on. If None will use the active configuration, defaults to None.
+    :type configuration: bool, optional
     :return: The x and y data of the FFTMTF analysis.
     :rtype: tuple[np.ndarray, np.ndarray]
     """
+    CURRENT_CONFIG = int(self.MCE_GetCurrentConfig())
+    if configuration is None:
+        self.MCE_SetActiveConfig(CURRENT_CONFIG)
+    else:
+        self.MCE_SetActiveConfig(configuration)
     # Code wise this is just an adapt of the FFT MTF
     # convert wavelength/fields/surface
     if not (isinstance(wavelength, int) and wavelength == 0):
@@ -777,7 +809,7 @@ def Analyses_HuygensMTF(
         Settings['HMF_IMAGEDELTA']    = str(int(0))
     else:
         Settings['HMF_IMAGEDELTA']    = str(float(image_delta_microns))
-    Settings['HMF_CONFIG']    = str(int(0)) # TODO support configurations
+    Settings['HMF_CONFIG']    = str(int(self.MCE_GetCurrentConfig())) 
     Settings['HMF_WAVE']      = str(int(wavelength))
     Settings['HMF_FIELD']     = str(int(field))
     Settings['HMF_TYPE']      = str(int(0)) # Only mode 0 = Modulation is supported by Zemax for Huygens
@@ -804,8 +836,129 @@ def Analyses_HuygensMTF(
     attrs={
         'Field_Type'    : str(self.Field_GetFieldType()),
         'Lens_Units'    : str(units["LensUnits"]),
+        'MCE_Configuration' : int(self.MCE_GetCurrentConfig()),
     }
     )
+    self.MCE_SetActiveConfig(CURRENT_CONFIG)
     return out
 
 
+def Analyses_HuygensPSF(
+    self,
+    wavelength: int | float | ZOSAPI_SystemData_IWavelength = 0,
+    field: int | ZOSAPI_SystemData_IField = 1,
+    pupil_size: str = "256x256",
+    image_size: str = "256x256",
+    image_delta_microns:int|float=0,
+    rotation:int = 0,
+    use_polarization: bool = True,
+    use_normalization: bool = True,
+    use_centroid: bool = False,
+    configuration:int=None,
+) -> xr.Dataset:
+    """
+    Get the (sequential) Huygens PSF of the system.
+
+    :param wavelength: System wavelength (as index, microns, or object) to do the MTF on. An int of 0 selects all all wavelengths, Defaults to 0.
+    :type wavelength: int | float | ZOSAPI_SystemData_IWavelength, optional
+    :param field: System field (index of object) to do the MTF on.  An int of 0 selects all fields, defaults to 0
+    :type field: int | ZOSAPI_SystemData_IField, optional
+    :param pupil_sample_size:  Selects the size of the grid of rays to trace to perform the computation. Higher sampling densities yield more accurate results at the expense of longer computation times.
+                               '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+    :type pupil_sample_size: str, optional
+    :param image_sample_size: The size of the grid of points on which to compute the diffraction image intensity. This number, combined with the image delta, determine the size of the area displayed. 
+                              '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+    :type image_sample_size: str, optional
+    :param image_delta_microns: The distance in micrometers between points in the image grid. Use zero for the default grid spacing, defaults to 0
+    :type image_delta: int|float, optional
+    :param rotation:  Rotation specifies how the surface plots are rotated; either 0, 90, 180, or 270 degrees, defaults to 0
+    :type rotation: int, optional
+    :param use_polarization: Use polarization, defaults to True
+    :type use_polarization: bool, optional
+    :param use_normalization: If should normalize the PSF or not, defaults to True
+    :type use_normalization: bool, optional
+    :param use_centroid:  If true, the plot will be centered on the geometric image centroid. If false, the plot will be centered on the chief ray, defaults to False
+    :type use_centroid: bool, optional
+    :param configuration: MCE configration to perform the analysis on. If None will use the active configuration, defaults to None.
+    :type configuration: bool, optional
+    :return: The x and y data of the FFTMTF analysis.
+    :rtype: tuple[np.ndarray, np.ndarray]
+    """
+    CURRENT_CONFIG = int(self.MCE_GetCurrentConfig())
+    if configuration is None:
+        self.MCE_SetActiveConfig(CURRENT_CONFIG)
+    else:
+        self.MCE_SetActiveConfig(configuration)
+    # convert wavelength/fields/surface
+    if not (isinstance(wavelength, int) and wavelength == 0):
+        wavelength = self._convert_raw_wavelength_input_(wavelength, return_index=True)
+    field = self._convert_raw_field_input_(field, return_index=True)
+    def _do_psf_mode_(PSF_type:str):
+        # Like the FFT PSF, this has options that are not docummented or seemignly accessable through what :func:`Analyses_RunAnalysesAndGetResults` would do.
+        # This actually seems to be build on a "newer" version of the Zemax settings API which is much less abstractable it seems.
+        # Doing manual assignmnet below through the use of `analysis_settings_obj.__implementation__`.
+        analysis_obj, analysis_settings_obj, analysis_enum    = self._Analysis_GetZOSObjectAndSettings_(analysis='HuygensPsf')
+        analysis_settings_obj                                 = analysis_settings_obj.__implementation__
+        # 
+        analysis_settings_obj.ImageSampleSize                 = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.SampleSizes, image_size, extra_include_filter="S_")
+        analysis_settings_obj.PupilSampleSize                 = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.SampleSizes, pupil_size, extra_include_filter="S_")
+        analysis_settings_obj.Rotation                        = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.Rotations, str(rotation))
+        analysis_settings_obj.Wavelength.SetWavelengthNumber(int(wavelength))
+        analysis_settings_obj.Field.SetFieldNumber(int(field))
+        analysis_settings_obj.Type                            = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.HuygensPsfTypes, PSF_type)
+        analysis_settings_obj.UsePolarization                 = use_polarization
+        analysis_settings_obj.Normalize                       = use_normalization
+        analysis_settings_obj.UseCentroid                     = use_centroid
+        analysis_settings_obj.ImageDelta                      = float(image_delta_microns)
+        cp("!@lg!@Analyses_HuygensPSF :: Calculating Huygens PSF [!@lm!@%s!@lg!@]..." % PSF_type)  
+        analysis_obj.ApplyAndWaitForCompletion()
+        results = analysis_obj.GetResults()
+        results.GetTextFile(self.Utilities_AnalysesFilesDir() + os.sep + "HuygensPSF.txt")
+        info = self.Analyses_ExtractSectionOfTextFile(
+            in_file=self.Utilities_AnalysesFilesDir() + os.sep + "HuygensPSF.txt",
+            start_marker="Date",
+            end_marker="Values")
+        gar, xar, yar = self._Analysis_GeneralDataGridReader_(results)
+        return gar[0], xar[0], yar[0], info
+    ling, x, y, info    = _do_psf_mode_('Linear')
+    logm1g, _, _, _     = _do_psf_mode_('Log_Minus_1')
+    logm2g, _, _, _     = _do_psf_mode_('Log_Minus_2')
+    logm3g, _, _, _     = _do_psf_mode_('Log_Minus_3')
+    logm4g, _, _, _     = _do_psf_mode_('Log_Minus_4')
+    logm5g, _, _, _     = _do_psf_mode_('Log_Minus_5')
+    phaseg, _, _, _     = _do_psf_mode_('phase')
+    realg, _, _, _      = _do_psf_mode_('real')
+    imagg, _, _, _      = _do_psf_mode_('imaginary')
+    units               = self.Utilities_GetAllSystemUnits()
+    cp("!@lg!@Analyses_HuygensPSF :: Done Calculating FFT PSF.")
+    out = xr.Dataset(
+    {
+        "linear"                : (("y_micrometers", "x_micrometers"), ling.astype(float)),
+        "log_m1"                : (("y_micrometers", "x_micrometers"), logm1g.astype(float)),
+        "log_m2"                : (("y_micrometers", "x_micrometers"), logm2g.astype(float)),
+        "log_m3"                : (("y_micrometers", "x_micrometers"), logm3g.astype(float)),
+        "log_m4"                : (("y_micrometers", "x_micrometers"), logm4g.astype(float)),
+        "log_m5"                : (("y_micrometers", "x_micrometers"), logm5g.astype(float)),
+        "phase"                : (("y_micrometers", "x_micrometers"), phaseg.astype(float)),
+        "real_part"                : (("y_micrometers", "x_micrometers"), realg.astype(float)),
+        "imag_part"                : (("y_micrometers", "x_micrometers"), imagg.astype(float)),
+    }, 
+    coords={
+        "x_micrometers": ("x_micrometers", x.astype(float),),
+        "y_micrometers": ("y_micrometers", y.astype(float),),
+    },
+    attrs={
+        'Field_Type'          : str(self.Field_GetFieldType()),
+        'Field_X'             : float(self.Field_GetField(field).X),
+        'Field_Y'             : float(self.Field_GetField(field).Y),
+        'Lens_Units'          : str(units["LensUnits"]),
+        'Data_Spacing'        : str(' '.join(info[1].split(' ')[-2::]).strip('.')),
+        'Strehl_Ratio'        : float(info[3].split(':')[-1].strip('.').strip(' ')),
+        f'Center_Coord_{info[7].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1]}'  : [float(x.strip(' ').split(' ')[0]) for x in info[7].split(':')[-1].strip('.').strip(' ').split(',')],
+        f'Centroid_Offset_{info[8].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1]}'  : [float(x.strip(' ').split(' ')[0]) for x in info[8].split(':')[-1].strip('.').strip(' ').split(',')],
+        f'Centroid_Coord_{info[9].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1]}'  : [float(x.strip(' ').split(' ')[0]) for x in info[9].split(':')[-1].strip('.').strip(' ').split(',')],
+        'MCE_Configuration'  : int(self.MCE_GetCurrentConfig()),
+    }
+    )
+    self.MCE_SetActiveConfig(CURRENT_CONFIG)
+    return out

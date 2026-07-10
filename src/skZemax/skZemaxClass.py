@@ -46,6 +46,7 @@ class skZemaxClass(PythonStandaloneApplication):
         Analyses_FFTMTF,
         Analyses_FFTPSF,
         Analyses_HuygensMTF,
+        Analyses_HuygensPSF,
         Analyses_Footprint,
         Analyses_GetNamesOfAllAnalyses,
         Analyses_ReportSurfacePrescription,
