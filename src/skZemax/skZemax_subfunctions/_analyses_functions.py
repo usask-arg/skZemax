@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-
+from scipy.integrate import cumulative_trapezoid
 import numpy as np
 import xarray as xr
 from box import Box
@@ -28,6 +28,35 @@ from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
 type ZOSAPI_Analysis_Data_IA = object  # <- ZOSAPI.Analysis.IA_ # The actual module is referenced by the base PythonStandaloneApplication class.
 type ZOSAPI_Analysis_Data_IAR = object  # <- ZOSAPI.Analysis.Data.IAR_ # The actual module is referenced by the base PythonStandaloneApplication class.
 type ZOSAPI_Analysis_Data_IAS = object  # <- ZOSAPI.Analysis.Settings.IAS_ # The actual module is referenced by the base PythonStandaloneApplication class.
+
+def _Analysis_CalcLsfEsfFrom2DPsf_(self, psf:np.ndarray, x:np.ndarray, y:np.ndarray, normalize:bool=True):
+    """Worker function to calculate the vertical and horizontal line spread functions and edge spread functions
+       from a 2D PSF.    
+
+       lsf_x and esf_x are functions of x, i.e. if there is a line/edge oriented along the vertical (y) dir.
+       lsf_y and esf_y are functions of y, i.e. if there is a line/edge oriented along the horizontal (x) dir.
+
+    :param psf: The 2D PSF
+    :type psf: np.ndarray
+    :param x: The values of the x component
+    :type x: np.ndarray
+    :param y: The values of the y component
+    :type y: np.ndarray
+    :param normalize: If should normalize the lsf and esf functions, defaults to True
+    :type normalize: bool, optional
+    """
+    lsf_x = np.trapezoid(psf, x=y, axis=0).astype(float)
+    esf_x = cumulative_trapezoid(lsf_x, x=x, initial=0)
+    lsf_y = np.trapezoid(psf, x=x, axis=1).astype(float)
+    esf_y = cumulative_trapezoid(lsf_y, x=y, initial=0)
+    if normalize:
+        # Normalize LSFs to peak = 1
+        lsf_x /= lsf_x.max()
+        lsf_y /= lsf_y.max()
+        # Normalize ESFs to range [0, 1]
+        esf_x = (esf_x - esf_x.min()) / (esf_x.max() - esf_x.min())
+        esf_y = (esf_y - esf_y.min()) / (esf_y.max() - esf_y.min())
+    return lsf_x, lsf_y, esf_x, esf_y
 
 def _Analysis_GeneralDataSeriesReader_(self, results:ZOSAPI_Analysis_Data_IAR):
     """Germanized worker for reading X and Y data from data series returned from an analysis GetResults() call.
@@ -282,7 +311,8 @@ def Analyses_RunAnalysesAndGetResults(
     analysis_obj.ApplyAndWaitForCompletion()
     if self._verbose:
         cp("!@lg!@Analyses_RunAnalysesAndGetResults :: Done.")
-    return analysis_obj.GetResults()
+    results = analysis_obj.GetResults()
+    return results
 
 
 def Analyses_ReportSystemPrescription(
@@ -617,19 +647,19 @@ def Analyses_FFTMTF(
     cp("!@lg!@Analyses_FFTMTF :: Done Calculating FFT MTF.")
     out = xr.Dataset(
     {
-        "modulation"                : (("field", freq_units, 'ray_type'), mod_y[1::].astype(float)),
-        "phase"                     : (("field", freq_units, 'ray_type'), phase_y[1::].astype(float)),
-        "real_part"                 : (("field", freq_units, 'ray_type'), real_y[1::].astype(float)),
-        "imag_part"                 : (("field", freq_units, 'ray_type'), imag_y[1::].astype(float)),
-        "square_wave"               : (("field", freq_units, 'ray_type'), square_y[1::].astype(float)),
-        "modulation_diff_limited"   : ((freq_units, 'ray_type'), mod_y[0].astype(float)),
-        "phase_diff_limited"        : ((freq_units, 'ray_type'), phase_y[0].astype(float)),
-        "real_diff_limited"         : ((freq_units, 'ray_type'), real_y[0].astype(float)),
-        "imaginary_diff_limited"    : ((freq_units, 'ray_type'), imag_y[0].astype(float)),
-        "square_wave_diff_limited"  : ((freq_units, 'ray_type'), square_y[0].astype(float)),
+        "modulation"                : (("field", 'freq', 'ray_type'), mod_y[1::].astype(float)),
+        "phase"                     : (("field", 'freq', 'ray_type'), phase_y[1::].astype(float)),
+        "real_part"                 : (("field", 'freq', 'ray_type'), real_y[1::].astype(float)),
+        "imag_part"                 : (("field", 'freq', 'ray_type'), imag_y[1::].astype(float)),
+        "square_wave"               : (("field", 'freq', 'ray_type'), square_y[1::].astype(float)),
+        "modulation_diff_limited"   : (('freq', 'ray_type'), mod_y[0].astype(float)),
+        "phase_diff_limited"        : (('freq', 'ray_type'), phase_y[0].astype(float)),
+        "real_diff_limited"         : (('freq', 'ray_type'), real_y[0].astype(float)),
+        "imaginary_diff_limited"    : (('freq', 'ray_type'), imag_y[0].astype(float)),
+        "square_wave_diff_limited"  : (('freq', 'ray_type'), square_y[0].astype(float)),
     }, 
     coords={
-        freq_units: (freq_units, freq[0].astype(float),),
+        'freq': ('freq', freq[0].astype(float),{'units': freq_units}),
         "field_x": ("field", np.array([x.X for x in fields]).astype(float),),
         "field_y": ("field", np.array([x.Y for x in fields]).astype(float),),
         "ray_type": ("ray_type", np.array(['sagittal_periodic_in_object_y', 'tangential_periodic_in_object_x']).astype(str),),
@@ -646,7 +676,7 @@ def Analyses_FFTMTF(
 def Analyses_FFTPSF(
     self,
     wavelength: int | float | ZOSAPI_SystemData_IWavelength = 0,
-    field: int | ZOSAPI_SystemData_IField = 1,
+    field: int | ZOSAPI_SystemData_IField = 0,
     surface: int | ZOSAPI_Editors_LDE_ILDERow = 0,
     sample_size: str = "256x256",
     output_size: str = "512x512",
@@ -687,10 +717,13 @@ def Analyses_FFTPSF(
     # convert wavelength/fields/surface
     if not (isinstance(wavelength, int) and wavelength == 0):
         wavelength = self._convert_raw_wavelength_input_(wavelength, return_index=True)
-    field = self._convert_raw_field_input_(field, return_index=True)
+    if not (isinstance(field, int) and field == 0):
+        field = np.array([self._convert_raw_field_input_(field, return_index=True)])
+    else:
+        field = np.arange(1, self.Fields_GetNumberOfFields()+1)
     if not (isinstance(surface, int) and surface == 0):
         surface = self._convert_raw_field_input_(surface, return_index=True)
-    def _do_psf_mode_(PSF_type:str):
+    def _do_psf_mode_(PSF_type:str, field_idx:int):
         # "OutputSize" is not docummented or seemignly accessable through what :func:`Analyses_RunAnalysesAndGetResults` would do.
         # This actually seems to be build on a "newer" version of the Zemax settings API which is much less abstractable it seems.
         # Doing manual assignmnet below through the use of `analysis_settings_obj.__implementation__`.
@@ -699,7 +732,7 @@ def Analyses_FFTPSF(
         analysis_settings_obj.SampleSize                      = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.Psf.PsfSampling, sample_size, extra_include_filter="S_")
         analysis_settings_obj.OutputSize                      = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.Psf.PsfSampling, output_size, extra_include_filter="S_")
         analysis_settings_obj.Wavelength.SetWavelengthNumber(int(wavelength))
-        analysis_settings_obj.Field.SetFieldNumber(int(field))
+        analysis_settings_obj.Field.SetFieldNumber(int(field_idx))
         analysis_settings_obj.Type                            = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.Psf.FftPsfType, PSF_type)
         analysis_settings_obj.Surface.SetSurfaceNumber(int(surface))
         analysis_settings_obj.UsePolarization                 = use_polarization
@@ -714,65 +747,80 @@ def Analyses_FFTPSF(
             start_marker="Date",
             end_marker="Values")
         gar, xar, yar = self._Analysis_GeneralDataGridReader_(results)
+        analysis_obj.Close()
+        del analysis_obj
         return gar[0], xar[0], yar[0], info
-    ling, x, y, info   = _do_psf_mode_('linear')
-    logg, _, _, _   = _do_psf_mode_('log')
-    phaseg, _, _, _   = _do_psf_mode_('phase')
-    realg, _, _, _   = _do_psf_mode_('real')
-    imagg, _, _, _   = _do_psf_mode_('imaginary')
-    units         = self.Utilities_GetAllSystemUnits()
-    cp("!@lg!@Analyses_FFTPSF :: Done Calculating FFT PSF.")
-    out = xr.Dataset(
-    {
-        "linear"                : (("y_micrometers", "x_micrometers"), ling.astype(float)),
-        "log"                : (("y_micrometers", "x_micrometers"), logg.astype(float)),
-        "phase"                : (("y_micrometers", "x_micrometers"), phaseg.astype(float)),
-        "real_part"                : (("y_micrometers", "x_micrometers"), realg.astype(float)),
-        "imag_part"                : (("y_micrometers", "x_micrometers"), imagg.astype(float)),
-    }, 
-    coords={
-        "x_micrometers": ("x_micrometers", x.astype(float),),
-        "y_micrometers": ("y_micrometers", y.astype(float),),
-    },
-    attrs={
-        'Field_Type'          : str(self.Field_GetFieldType()),
-        'Field_X'             : float(self.Field_GetField(field).X),
-        'Field_Y'             : float(self.Field_GetField(field).Y),
-        'Lens_Units'          : str(units["LensUnits"]),
-        'Data_Spacing'        : str(info[2].split('is')[-1].strip(' ').strip('.')),
-        'Pupil_Grid'        : str(info[6].split(':')[-1].strip(' ').strip('.')),
-        'Image_Grid'        : str(info[7].split(':')[-1].strip(' ').strip('.')),
-        'Center_Point'        : [x.split(' ')[-1].strip(' ').strip(',')  for x in info[8].split(':')[-1].strip(' ').strip('.').split(', ')],
-        'MCE_Configuration'   : int(self.MCE_GetCurrentConfig()),
-    }
-    )
+    out_list = []
+    for fieldidx in field:
+        cp(f"!@lg!@Analyses_FFTPSF :: Calculating FFT PSF for field [!@lm!@{fieldidx}!@lg!@].")
+        ling, x, y, info   = _do_psf_mode_('linear', field_idx=fieldidx)
+        logg, _, _, _   = _do_psf_mode_('log', field_idx=fieldidx)
+        phaseg, _, _, _   = _do_psf_mode_('phase', field_idx=fieldidx)
+        realg, _, _, _   = _do_psf_mode_('real', field_idx=fieldidx)
+        imagg, _, _, _   = _do_psf_mode_('imaginary', field_idx=fieldidx)
+        units         = self.Utilities_GetAllSystemUnits()
+        lsf_x, lsf_y, esf_x, esf_y = self._Analysis_CalcLsfEsfFrom2DPsf_(psf=ling, x=x, y=y, normalize=True)
+        cp("!@lg!@Analyses_FFTPSF :: Done Calculating FFT PSF.")
+        out_list.append(xr.Dataset(
+        {
+            "linear"                : (("field", "y", "x"), ling.astype(float)[np.newaxis]),
+            "lsf_x"                : (("field", "x"), lsf_x[np.newaxis]),
+            "esf_x"                : (("field", "x"), esf_x[np.newaxis]),
+            "lsf_y"                : (("field", "y"), lsf_y[np.newaxis]),
+            "esf_y"                : (("field", "y"), esf_y[np.newaxis]),
+            "log"                : (("field", "y", "x"), logg.astype(float)[np.newaxis]),
+            "phase"                : (("field", "y", "x"), phaseg.astype(float)[np.newaxis]),
+            "real_part"                : (("field", "y", "x"), realg.astype(float)[np.newaxis]),
+            "imag_part"                : (("field", "y", "x"), imagg.astype(float)[np.newaxis]),
+            "data_spacing"    : ("field", np.array([float(info[2].split('is')[-1].strip(' ').strip('.').split(' ')[0])]), {'units':info[2].split('is')[-1].strip(' ').strip('.').split(' ')[1]}),
+        }, 
+        coords={
+            "field"           : ("field", np.array([fieldidx]),),
+            "field_x"         : ("field", np.array([float(self.Field_GetField(fieldidx).X)]),),
+            "field_y"         : ("field", np.array([float(self.Field_GetField(fieldidx).Y)]),),
+            'center_point_row'    : (("field"), np.array([[int(x.split(' ')[-1].strip(' ').strip(','))  for x in info[8].split(':')[-1].strip(' ').strip('.').split(', ')][0]]),),
+            'center_point_col'    : (("field"), np.array([[int(x.split(' ')[-1].strip(' ').strip(','))  for x in info[8].split(':')[-1].strip(' ').strip('.').split(', ')][1]]),),
+            
+            "x"   : (("field", "x"), x.astype(float)[np.newaxis],{'units' : 'micrometers'}),
+            "y"   : (("field", "y"), y.astype(float)[np.newaxis],{'units' : 'micrometers'}),
+        },
+        attrs={
+            'Field_Type'          : str(self.Field_GetFieldType()),
+            'Lens_Units'          : str(units["LensUnits"]),
+            'Pupil_Grid'        : str(info[6].split(':')[-1].strip(' ').strip('.')),
+            'Image_Grid'        : str(info[7].split(':')[-1].strip(' ').strip('.')),
+            'MCE_Configuration'   : int(self.MCE_GetCurrentConfig()),
+            'LSF_ESF_NOTE' : "This may differ from Zemax FFT LSF/ESF analysis even given the same settings. Not in fundmental theory, but Zemax adjusts the sampeling in a way that is unclear to reproduce.",
+        }
+        ))
+        
     self.MCE_SetActiveConfig(CURRENT_CONFIG)
-    return out
+    return xr.concat(out_list, dim="field", join='exact')
 
 
 def Analyses_HuygensMTF(
     self,
     wavelength: int | float | ZOSAPI_SystemData_IWavelength = 0,
     field: int | ZOSAPI_SystemData_IField = 0,
-    pupil_sample_size: str = "256x256",
-    image_sample_size: str = "256x256",
+    pupil_sample_size: str = "64x64",
+    image_sample_size: str = "64x64",
     image_delta_microns:int|float=0,
     max_freq: float = 0,
     use_polarization: bool = True,
     configuration:int=None,
 ) -> xr.Dataset:
     """
-    Get the Huygens MTF of the system.
+    Get the Huygens MTF of the system. Simply, this is more accurate than the FFT version, but (possibly much) slower.
     
     :param wavelength: System wavelength (as index, microns, or object) to do the MTF on. An int of 0 selects all all wavelengths, Defaults to 0.
     :type wavelength: int | float | ZOSAPI_SystemData_IWavelength, optional
     :param field: System field (index of object) to do the MTF on.  An int of 0 selects all fields, defaults to 0
     :type field: int | ZOSAPI_SystemData_IField, optional
     :param pupil_sample_size:  Selects the size of the grid of rays to trace to perform the computation. Higher sampling densities yield more accurate results at the expense of longer computation times.
-                               '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+                               '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '64x64'
     :type pupil_sample_size: str, optional
     :param image_sample_size: The size of the grid of points on which to compute the diffraction image intensity. This number, combined with the image delta, determine the size of the area displayed. 
-                              '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+                              '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '64x64'
     :type image_sample_size: str, optional
     :param image_delta_microns: The distance in micrometers between points in the image grid. Use zero for the default grid spacing, defaults to 0
     :type image_delta: int|float, optional
@@ -825,10 +873,10 @@ def Analyses_HuygensMTF(
     freq_units    = str(units["MTFUnits"])
     out = xr.Dataset(
     {
-        "modulation"                : (("field", freq_units, 'ray_type'), mod_y.astype(float)),
+        "modulation"                : (("field", 'freq', 'ray_type'), mod_y.astype(float)),
     }, 
     coords={
-        freq_units: (freq_units, freq[0].astype(float),),
+        'freq': ('freq', freq[0].astype(float),{'units':freq_units}),
         "field_x": ("field", np.array([x.X for x in fields]).astype(float),),
         "field_y": ("field", np.array([x.Y for x in fields]).astype(float),),
         "ray_type": ("ray_type", np.array(['sagittal_periodic_in_image_y', 'tangential_periodic_in_image_x']).astype(str),),
@@ -846,9 +894,9 @@ def Analyses_HuygensMTF(
 def Analyses_HuygensPSF(
     self,
     wavelength: int | float | ZOSAPI_SystemData_IWavelength = 0,
-    field: int | ZOSAPI_SystemData_IField = 1,
-    pupil_size: str = "256x256",
-    image_size: str = "256x256",
+    field: int | ZOSAPI_SystemData_IField = 0,
+    pupil_size: str = "64x64",
+    image_size: str = "64x64",
     image_delta_microns:int|float=0,
     rotation:int = 0,
     use_polarization: bool = True,
@@ -857,17 +905,17 @@ def Analyses_HuygensPSF(
     configuration:int=None,
 ) -> xr.Dataset:
     """
-    Get the (sequential) Huygens PSF of the system.
+    Get the (sequential) Huygens PSF of the system. Simply, this is more accurate than the FFT version, but (possibly much) slower.
 
     :param wavelength: System wavelength (as index, microns, or object) to do the MTF on. An int of 0 selects all all wavelengths, Defaults to 0.
     :type wavelength: int | float | ZOSAPI_SystemData_IWavelength, optional
     :param field: System field (index of object) to do the MTF on.  An int of 0 selects all fields, defaults to 0
     :type field: int | ZOSAPI_SystemData_IField, optional
     :param pupil_sample_size:  Selects the size of the grid of rays to trace to perform the computation. Higher sampling densities yield more accurate results at the expense of longer computation times.
-                               '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+                               '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '64x64'
     :type pupil_sample_size: str, optional
     :param image_sample_size: The size of the grid of points on which to compute the diffraction image intensity. This number, combined with the image delta, determine the size of the area displayed. 
-                              '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '256x256'
+                              '32x32', '64x64', '128x128', '256x256', '512x512', '1024x1024', '2048x2048',  '4096x4096',  '8192x8192', '16384x16384', defaults to '64x64'
     :type image_sample_size: str, optional
     :param image_delta_microns: The distance in micrometers between points in the image grid. Use zero for the default grid spacing, defaults to 0
     :type image_delta: int|float, optional
@@ -892,8 +940,11 @@ def Analyses_HuygensPSF(
     # convert wavelength/fields/surface
     if not (isinstance(wavelength, int) and wavelength == 0):
         wavelength = self._convert_raw_wavelength_input_(wavelength, return_index=True)
-    field = self._convert_raw_field_input_(field, return_index=True)
-    def _do_psf_mode_(PSF_type:str):
+    if not (isinstance(field, int) and field == 0):
+        field = np.array([self._convert_raw_field_input_(field, return_index=True)])
+    else:
+        field = np.arange(1, self.Fields_GetNumberOfFields()+1)
+    def _do_psf_mode_(PSF_type:str, field_idx:int):
         # Like the FFT PSF, this has options that are not docummented or seemignly accessable through what :func:`Analyses_RunAnalysesAndGetResults` would do.
         # This actually seems to be build on a "newer" version of the Zemax settings API which is much less abstractable it seems.
         # Doing manual assignmnet below through the use of `analysis_settings_obj.__implementation__`.
@@ -904,7 +955,7 @@ def Analyses_HuygensPSF(
         analysis_settings_obj.PupilSampleSize                 = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.SampleSizes, pupil_size, extra_include_filter="S_")
         analysis_settings_obj.Rotation                        = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.Rotations, str(rotation))
         analysis_settings_obj.Wavelength.SetWavelengthNumber(int(wavelength))
-        analysis_settings_obj.Field.SetFieldNumber(int(field))
+        analysis_settings_obj.Field.SetFieldNumber(int(field_idx))
         analysis_settings_obj.Type                            = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.HuygensPsfTypes, PSF_type)
         analysis_settings_obj.UsePolarization                 = use_polarization
         analysis_settings_obj.Normalize                       = use_normalization
@@ -920,45 +971,61 @@ def Analyses_HuygensPSF(
             end_marker="Values")
         gar, xar, yar = self._Analysis_GeneralDataGridReader_(results)
         return gar[0], xar[0], yar[0], info
-    ling, x, y, info    = _do_psf_mode_('Linear')
-    logm1g, _, _, _     = _do_psf_mode_('Log_Minus_1')
-    logm2g, _, _, _     = _do_psf_mode_('Log_Minus_2')
-    logm3g, _, _, _     = _do_psf_mode_('Log_Minus_3')
-    logm4g, _, _, _     = _do_psf_mode_('Log_Minus_4')
-    logm5g, _, _, _     = _do_psf_mode_('Log_Minus_5')
-    phaseg, _, _, _     = _do_psf_mode_('phase')
-    realg, _, _, _      = _do_psf_mode_('real')
-    imagg, _, _, _      = _do_psf_mode_('imaginary')
-    units               = self.Utilities_GetAllSystemUnits()
-    cp("!@lg!@Analyses_HuygensPSF :: Done Calculating FFT PSF.")
-    out = xr.Dataset(
-    {
-        "linear"                : (("y_micrometers", "x_micrometers"), ling.astype(float)),
-        "log_m1"                : (("y_micrometers", "x_micrometers"), logm1g.astype(float)),
-        "log_m2"                : (("y_micrometers", "x_micrometers"), logm2g.astype(float)),
-        "log_m3"                : (("y_micrometers", "x_micrometers"), logm3g.astype(float)),
-        "log_m4"                : (("y_micrometers", "x_micrometers"), logm4g.astype(float)),
-        "log_m5"                : (("y_micrometers", "x_micrometers"), logm5g.astype(float)),
-        "phase"                : (("y_micrometers", "x_micrometers"), phaseg.astype(float)),
-        "real_part"                : (("y_micrometers", "x_micrometers"), realg.astype(float)),
-        "imag_part"                : (("y_micrometers", "x_micrometers"), imagg.astype(float)),
-    }, 
-    coords={
-        "x_micrometers": ("x_micrometers", x.astype(float),),
-        "y_micrometers": ("y_micrometers", y.astype(float),),
-    },
-    attrs={
-        'Field_Type'          : str(self.Field_GetFieldType()),
-        'Field_X'             : float(self.Field_GetField(field).X),
-        'Field_Y'             : float(self.Field_GetField(field).Y),
-        'Lens_Units'          : str(units["LensUnits"]),
-        'Data_Spacing'        : str(' '.join(info[1].split(' ')[-2::]).strip('.')),
-        'Strehl_Ratio'        : float(info[3].split(':')[-1].strip('.').strip(' ')),
-        f'Center_Coord_{info[7].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1]}'  : [float(x.strip(' ').split(' ')[0]) for x in info[7].split(':')[-1].strip('.').strip(' ').split(',')],
-        f'Centroid_Offset_{info[8].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1]}'  : [float(x.strip(' ').split(' ')[0]) for x in info[8].split(':')[-1].strip('.').strip(' ').split(',')],
-        f'Centroid_Coord_{info[9].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1]}'  : [float(x.strip(' ').split(' ')[0]) for x in info[9].split(':')[-1].strip('.').strip(' ').split(',')],
-        'MCE_Configuration'  : int(self.MCE_GetCurrentConfig()),
-    }
-    )
+    out_list = []
+    for fieldidx in field:
+        cp(f"!@lg!@Analyses_HuygensPSF :: Calculating PSF for field [!@lm!@{fieldidx}!@lg!@].")
+        ling, x, y, info    = _do_psf_mode_('Linear', field_idx=fieldidx)
+        logm1g, _, _, _     = _do_psf_mode_('Log_Minus_1', field_idx=fieldidx)
+        logm2g, _, _, _     = _do_psf_mode_('Log_Minus_2', field_idx=fieldidx)
+        logm3g, _, _, _     = _do_psf_mode_('Log_Minus_3', field_idx=fieldidx)
+        logm4g, _, _, _     = _do_psf_mode_('Log_Minus_4', field_idx=fieldidx)
+        logm5g, _, _, _     = _do_psf_mode_('Log_Minus_5', field_idx=fieldidx)
+        phaseg, _, _, _     = _do_psf_mode_('phase', field_idx=fieldidx)
+        realg, _, _, _      = _do_psf_mode_('real', field_idx=fieldidx)
+        imagg, _, _, _      = _do_psf_mode_('imaginary', field_idx=fieldidx)
+        units               = self.Utilities_GetAllSystemUnits()
+        lsf_x, lsf_y, esf_x, esf_y = self._Analysis_CalcLsfEsfFrom2DPsf_(psf=ling, x=x, y=y, normalize=True)
+        cp("!@lg!@Analyses_HuygensPSF :: Done Calculating PSF.")
+        out_list.append(xr.Dataset(
+        {
+            "linear"                : (("field","y", "x"), ling.astype(float)[np.newaxis]),
+            "lsf_x"                : (("field", "x"), lsf_x[np.newaxis]),
+            "esf_x"                : (("field", "x"), esf_x[np.newaxis]),
+            "lsf_y"                : (("field", "y"), lsf_y[np.newaxis]),
+            "esf_y"                : (("field", "y"), esf_y[np.newaxis]),
+            "log_m1"                : (("field","y", "x"), logm1g.astype(float)[np.newaxis]),
+            "log_m2"                : (("field","y", "x"), logm2g.astype(float)[np.newaxis]),
+            "log_m3"                : (("field","y", "x"), logm3g.astype(float)[np.newaxis]),
+            "log_m4"                : (("field","y", "x"), logm4g.astype(float)[np.newaxis]),
+            "log_m5"                : (("field","y", "x"), logm5g.astype(float)[np.newaxis]),
+            "phase"                : (("field","y", "x"), phaseg.astype(float)[np.newaxis]),
+            "real_part"                : (("field","y", "x"), realg.astype(float)[np.newaxis]),
+            "imag_part"                : (("field","y", "x"), imagg.astype(float)[np.newaxis]),
+            "data_spacing"    : ("field", np.array([float(' '.join(info[1].split(' ')[-2::]).strip('.').split(' ')[0])]), {'units':str(' '.join(info[1].split(' ')[-2::]).strip('.').split(' ')[1])}),
+            "strehl_ratio"    : ("field", np.array([float(info[3].split(':')[-1].strip('.').strip(' '))]),),
+        }, 
+        coords={
+            "field"           : ("field", np.array([fieldidx]),),
+            "field_x"         : ("field", np.array([float(self.Field_GetField(fieldidx).X)]),),
+            "field_y"         : ("field", np.array([float(self.Field_GetField(fieldidx).Y)]),),
+            "x": (("field","x"), x.astype(float)[np.newaxis],{'units':'micrometers'}),
+            "y": (("field","y"), y.astype(float)[np.newaxis],{'units':'micrometers'}),
+            'center_point_row'    : (("field"), np.array([[int(x.split(' ')[-1].strip(' ').strip(','))  for x in info[6].split(':')[-1].strip(' ').strip('.').split(', ')][0]]),),
+            'center_point_col'    : (("field"), np.array([[int(x.split(' ')[-1].strip(' ').strip(','))  for x in info[6].split(':')[-1].strip(' ').strip('.').split(', ')][1]]),),
+            "center_coord_row"    : (("field"), np.array([[float(x.strip(' ').split(' ')[0]) for x in info[7].split(':')[-1].strip('.').strip(' ').split(',')][0]]),{'units': str(info[7].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1])}),
+            "center_coord_col"    : (("field"), np.array([[float(x.strip(' ').split(' ')[0]) for x in info[7].split(':')[-1].strip('.').strip(' ').split(',')][1]]),{'units': str(info[7].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1])}),
+            "center_offset_row"    : (("field"), np.array([[float(x.strip(' ').split(' ')[0]) for x in info[8].split(':')[-1].strip('.').strip(' ').split(',')][0]]),{'units': str(info[8].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1])}),
+            "center_offset_col"    : (("field"), np.array([[float(x.strip(' ').split(' ')[0]) for x in info[8].split(':')[-1].strip('.').strip(' ').split(',')][1]]),{'units': str(info[8].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1])}),
+            "centroid_coord_row"    : (("field"), np.array([[float(x.strip(' ').split(' ')[0]) for x in info[9].split(':')[-1].strip('.').strip(' ').split(',')][0]]),{'units': str(info[9].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1])}),
+            "centroid_coord_col"    : (("field"), np.array([[float(x.strip(' ').split(' ')[0]) for x in info[9].split(':')[-1].strip('.').strip(' ').split(',')][1]]),{'units': str(info[9].split(':')[-1].strip('.').strip(' ').split(',')[-1].split(' ')[-1])}),
+        },
+        attrs={
+            'Field_Type'          : str(self.Field_GetFieldType()),
+            'Lens_Units'          : str(units["LensUnits"]),
+            'Pupil_Grid'        : str(info[4].split(':')[-1].strip(' ').strip('.')),
+            'Image_Grid'        : str(info[5].split(':')[-1].strip(' ').strip('.')),
+            'MCE_Configuration'  : int(self.MCE_GetCurrentConfig()),
+        }
+        ))
     self.MCE_SetActiveConfig(CURRENT_CONFIG)
-    return out
+    return xr.concat(out_list, dim="field", join='exact')

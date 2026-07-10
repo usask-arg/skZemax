@@ -1080,7 +1080,7 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
             "Py": ("ray", PYarray),
         },
         coords={
-            "wavelengths_um": ("wvln", np.hstack(chuncked_wavelengths_um).astype(float)),
+            "wavelengths": ("wvln", np.hstack(chuncked_wavelengths_um).astype(float), {'units': 'microns'}),
             "ray_traceing_chunk_idx": ("wvln", np.hstack(chunck_idx).astype(int)),
         },
         attrs={
@@ -1125,6 +1125,7 @@ def _run_NormUnPol_raytrace_(
     :param ray_trace_rays:  Infromation of rays which should be traced. In this case, an xarray formatted as :func:`LDE_BuildRayTraceNormalizedUnpolarizedRays` does.
     :type ray_trace_rays: xr.Dataset
     """
+    units = self.Utilities_GetAllSystemUnits()
     # Append properties to the ray_trace_rays xarray.
     if bool(int(ray_trace_rays.attrs["do_all_surfaces_to_ending"])):
         surfaces_to_trace = np.arange(
@@ -1136,7 +1137,7 @@ def _run_NormUnPol_raytrace_(
     dims = "('wvln', 'surf', 'ray')"
     blank_rays = np.zeros(
         (
-            ray_trace_rays.wavelengths_um.shape[0],
+            ray_trace_rays.wavelengths.shape[0],
             surfaces_to_trace.shape[0],
             ray_trace_rays.ray.shape[0],
         )
@@ -1152,13 +1153,13 @@ def _run_NormUnPol_raytrace_(
         {"vignette": (eval(dims), blank_rays.astype(int))}
     )
     ray_trace_rays = ray_trace_rays.assign(
-        {"X": (eval(dims), blank_rays.astype(float))}
+        {"X": (eval(dims), blank_rays.astype(float), {'units': units['LensUnits']})}
     )
     ray_trace_rays = ray_trace_rays.assign(
-        {"Y": (eval(dims), blank_rays.astype(float))}
+        {"Y": (eval(dims), blank_rays.astype(float), {'units': units['LensUnits']})}
     )
     ray_trace_rays = ray_trace_rays.assign(
-        {"Z": (eval(dims), blank_rays.astype(float))}
+        {"Z": (eval(dims), blank_rays.astype(float), {'units': units['LensUnits']})}
     )
     ray_trace_rays = ray_trace_rays.assign(
         {"Xcosine": (eval(dims), blank_rays.astype(float))}
@@ -1179,10 +1180,10 @@ def _run_NormUnPol_raytrace_(
         {"Znormal": (eval(dims), blank_rays.astype(float))}
     )
     ray_trace_rays = ray_trace_rays.assign(
-        {"angle_in": (eval(dims), blank_rays.astype(float))}
+        {"angle_in": (eval(dims), blank_rays.astype(float), {'units': 'degrees'})}
     )
     ray_trace_rays = ray_trace_rays.assign(
-        {"OPD": (eval(dims), blank_rays.astype(float))}
+        {"OPD": (eval(dims), blank_rays.astype(float), {'units': units['LensUnits']})}
     )
     ray_trace_rays = ray_trace_rays.assign(
         {"intensity": (eval(dims), blank_rays.astype(float))}
@@ -1241,11 +1242,11 @@ def _run_NormUnPol_raytrace_(
     for chunk_idx in list(set(ray_trace_rays.ray_traceing_chunk_idx.values)):
         # Now set the wavelengths of the ray trace by chunk (since Zemax can only support 23 + the primary)
         self.Wavelength_RemoveAllButPrimaryWavelength()
-        if ray_trace_rays.wavelengths_um.shape[0] > 1:
+        if ray_trace_rays.wavelengths.shape[0] > 1:
             if chunk_idx == 0:
-                [self.Wavelength_AddWavelength(x) for x in ray_trace_rays.sel(ray_traceing_chunk_idx=chunk_idx).wavelengths_um[1::]]
+                [self.Wavelength_AddWavelength(x) for x in ray_trace_rays.sel(ray_traceing_chunk_idx=chunk_idx).wavelengths[1::]]
             else:
-                [self.Wavelength_AddWavelength(x) for x in ray_trace_rays.sel(ray_traceing_chunk_idx=chunk_idx).wavelengths_um]
+                [self.Wavelength_AddWavelength(x) for x in ray_trace_rays.sel(ray_traceing_chunk_idx=chunk_idx).wavelengths]
         wi = ray_trace_rays.ray_traceing_chunk_idx.values == chunk_idx
         number_of_wavelengths_in_chunk = self.Wavelength_GetNumberOfWavelengths()
         for surf_idx, surf in enumerate(surfaces_to_trace):
@@ -1411,9 +1412,9 @@ def _run_NormUnPol_raytrace_(
     )
     transformer = xr.Dataset(
         {
-            "Xo": ("surf", global_transofmrations[:, -3].astype(float)),
-            "Yo": ("surf", global_transofmrations[:, -2].astype(float)),
-            "Zo": ("surf", global_transofmrations[:, -1].astype(float)),
+            "Xo": ("surf", global_transofmrations[:, -3].astype(float), {'units': units['LensUnits']}),
+            "Yo": ("surf", global_transofmrations[:, -2].astype(float), {'units': units['LensUnits']}),
+            "Zo": ("surf", global_transofmrations[:, -1].astype(float), {'units': units['LensUnits']}),
             "R": (("surf", "row", "col"), R),
             "Vcosine": (
                 eval("('col'," + dims.strip("(")),
@@ -1440,13 +1441,13 @@ def _run_NormUnPol_raytrace_(
     cosine_glo = transformer.R.dot(transformer.Vcosine, dim="col")
     normal_glo = transformer.R.dot(transformer.Vnormal, dim="col")
     ray_trace_rays = ray_trace_rays.assign(
-        {"X_global": (eval(dims), (ray_trace_rays.X + transformer.Xo).values)}
+        {"X_global": (eval(dims), (ray_trace_rays.X + transformer.Xo).values, {'units': units['LensUnits']})}
     )
     ray_trace_rays = ray_trace_rays.assign(
-        {"Y_global": (eval(dims), (ray_trace_rays.Y + transformer.Yo).values)}
+        {"Y_global": (eval(dims), (ray_trace_rays.Y + transformer.Yo).values, {'units': units['LensUnits']})}
     )
     ray_trace_rays = ray_trace_rays.assign(
-        {"Z_global": (eval(dims), (ray_trace_rays.Z + transformer.Zo).values)}
+        {"Z_global": (eval(dims), (ray_trace_rays.Z + transformer.Zo).values, {'units': units['LensUnits']})}
     )
     ray_trace_rays = ray_trace_rays.assign(
         {

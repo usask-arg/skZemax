@@ -57,6 +57,7 @@ class skZemaxClass(PythonStandaloneApplication):
         _Analysis_GetZOSObjectAndSettings_,
         _Analysis_SetZOSObjectSettingsByBinaryAlteration_,
         _Analysis_SetZOSObjectSettingsByDict_,
+        _Analysis_CalcLsfEsfFrom2DPsf_,
     )
     from skZemax.skZemax_subfunctions._analyses_plotting_functions import (
         AnalysisPlotting_Footprint,
