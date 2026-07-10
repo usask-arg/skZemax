@@ -6,6 +6,8 @@ from scipy.integrate import cumulative_trapezoid
 import numpy as np
 import xarray as xr
 from box import Box
+from PIL import Image
+import shutil
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._LDE_functions import (
@@ -790,7 +792,7 @@ def Analyses_FFTPSF(
             'Pupil_Grid'        : str(info[6].split(':')[-1].strip(' ').strip('.')),
             'Image_Grid'        : str(info[7].split(':')[-1].strip(' ').strip('.')),
             'MCE_Configuration'   : int(self.MCE_GetCurrentConfig()),
-            'LSF_ESF_NOTE' : "This may differ from Zemax FFT LSF/ESF analysis even given the same settings. Not in fundmental theory, but Zemax adjusts the sampeling in a way that is unclear to reproduce.",
+            'LSF_ESF_NOTE' : "This may differ from Zemax FFT LSF/ESF specific analysis even given the same (as possible) settings. The integration done here is correct, but Zemax LSF/ESF specific analysis adjusts the sampeling in a way that is unclear to reproduce. It also has a coherent version which this cannot do.",
         }
         ))
         
@@ -1029,3 +1031,41 @@ def Analyses_HuygensPSF(
         ))
     self.MCE_SetActiveConfig(CURRENT_CONFIG)
     return xr.concat(out_list, dim="field", join='exact')
+
+def Analyses_ImageSimulation(self,
+                             input_image_full_path:str=None,
+                             field_height
+                             ):
+    # Load image for storage in xarray. Need to flipud to both make nice in xarray plot and to make it constsnt with Zemax (TODO check) 
+    if input_image_full_path is None:
+        input_image_full_path =  self.Utilities_ZemaxInstallationImageDir() + os.sep + 'ColorChart_Speos_4800x3600.png'
+        IMAGE_GIVEN = False
+    else:
+        IMAGE_GIVEN = True
+    img = Image.open(input_image_full_path)
+    input_image_rgb = np.flipud(np.array(img.convert("RGB")))
+    input_image_mono = np.flipud(np.array(img.convert("L")))
+    if IMAGE_GIVEN:
+        # Copy the given image to where Zemax can find it.
+        zemax_input_image_file_path = shutil.copy(input_image_full_path, self.Utilities_ZemaxInstallationImageDir())
+    # Configure settings
+    analysis_obj, analysis_settings_obj, analysis_enum    = self._Analysis_GetZOSObjectAndSettings_(analysis='ImageSimulation')
+    analysis_settings_obj                                 = analysis_settings_obj.__implementation__
+    analysis_settings_obj.InputFile                       = str(zemax_input_image_file_path.split(os.sep)[-1])
+    # Make xarray output
+    out = xr.Dataset(
+        {
+            "input_image_rgb"                : (("input_pix_y", "input_pix_x", "rgb"), input_image_rgb,),
+            "input_image_mono"                : (("input_pix_y", "input_pix_x"), input_image_mono,),
+        }, 
+        coords={
+            "input_x": (("input_pix_x"), np.arange(0, input_image_mono.shape[1]).astype(int),{'units':'input_pixels'}),
+            "input_y": (("input_pix_y"), np.arange(0, input_image_mono.shape[0]).astype(int),{'units':'input_pixels'}),
+        },
+        attrs={
+            'Input_Image_Path'  : str(input_image_full_path),
+        }
+        )
+    if IMAGE_GIVEN:
+        # Remove the copied input image from the zemax folder so you don't clutter the lib
+        os.remove(zemax_input_image_file_path)

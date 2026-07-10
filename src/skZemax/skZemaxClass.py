@@ -43,6 +43,7 @@ class skZemaxClass(PythonStandaloneApplication):
     # Adding skZemax_subfunctions to skZemaxClass
     from skZemax.skZemax_subfunctions._analyses_functions import (
         Analyses_ExtractSectionOfTextFile,
+        Analyses_ImageSimulation,
         Analyses_FFTMTF,
         Analyses_FFTPSF,
         Analyses_HuygensMTF,
