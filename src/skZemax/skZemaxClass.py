@@ -52,6 +52,7 @@ class skZemaxClass(PythonStandaloneApplication):
         Analyses_GetNamesOfAllAnalyses,
         Analyses_ReportSurfacePrescription,
         Analyses_ReportSystemPrescription,
+        Analyses_GetGeneralLensData,
         Analyses_RunAnalysesAndGetResults,
         _Analysis_GeneralDataSeriesReader_,
         _Analysis_GeneralDataGridReader_,

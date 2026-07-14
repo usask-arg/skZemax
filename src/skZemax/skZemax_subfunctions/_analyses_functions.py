@@ -340,6 +340,9 @@ def Analyses_ReportSystemPrescription(
     result.GetTextFile(save_path)
     with open(save_path, errors="replace") as file:
         content = file.read()
+    if save_textfile_path is None:
+        # Delete the default .txt file if no custom save path was given
+        os.remove(save_path)
     return [
         x for x in content.replace("\x00", "").strip("ÿþ").split("\n") if len(x) > 0
     ]
@@ -377,9 +380,53 @@ def Analyses_ReportSurfacePrescription(
     result.GetTextFile(save_path)
     with open(save_path, errors="replace") as file:
         content = file.read()
+    if save_textfile_path is None:
+        # Delete the default .txt file if no custom save path was given
+        os.remove(save_path)
     return [
         x for x in content.replace("\x00", "").strip("ÿþ").split("\n") if len(x) > 0
     ]
+
+
+def Analyses_GetGeneralLensData(self)->Box(dict()):
+    """This function does not do any "formal analysis" that Zemax does, instead it simply parses the "General Lens Data" section of :func:`Analyses_ReportSystemPrescription`
+       in a way that is nice to use in python (a boxed dict). 
+
+       There are functions like self.TheSystem.LDE.GetPupil() to get (most) of these values separately, but this is a succinct way to get most things one is interested in.
+    """
+    self.Analyses_ReportSystemPrescription(save_textfile_path=self.Utilities_AnalysesFilesDir() + os.sep + "PrescriptionDataSettings.txt")
+    general_data = self.Analyses_ExtractSectionOfTextFile(
+        in_file=self.Utilities_AnalysesFilesDir() + os.sep + "PrescriptionDataSettings.txt",
+        start_marker="GENERAL LENS DATA:",
+        end_marker="Fields",
+        )
+    os.remove(self.Utilities_AnalysesFilesDir() + os.sep + "PrescriptionDataSettings.txt")
+    def _format_datatype_(in_key:str, in_value:str):
+        in_key = in_key.strip().title().replace(" ", "")
+        in_value = in_value.replace("\t", "").strip()
+        if in_key == 'EffectiveFocalLength':
+            # Handle the special case of EFL having two entries with description in the values
+            in_key += in_value.split('(')[-1].strip(')').title().replace(' ', '')
+            in_value = in_value.split('(')[0]
+        try:
+            return in_key, int(in_value)  
+        except ValueError:
+            try:
+                return in_key, float(in_value)
+            except ValueError:
+                if in_value.lower() == 'on':
+                    return in_key, True
+                elif in_value.lower() == 'off':
+                    return in_key, False
+                else:
+                    return in_key, in_value
+    out = Box(dict(sorted( # Sort keys alphabetically
+    (
+        _format_datatype_(key, value)
+        for key, value in (line.split(":", 1) for line in general_data[:-1])
+    )
+    )))
+    return out
 
 
 @staticmethod
@@ -632,7 +679,7 @@ def Analyses_FFTMTF(
         Settings['MTF_SDLI']    = "1" # Always show diffraction limit
         Settings['MTF_POLAR']   = "1" if use_polarization else "0"
         Settings['MTF_DASH']    = "1" # Dash line (for "classic mode" and does not matter here)
-        cp("!@lg!@Analyses_FFTMTF :: Calculating FFT MTF [!@lm!@%s!@lg!@]." % MTF_type)
+        if self._verbose: cp("!@lg!@Analyses_FFTMTF :: Calculating FFT MTF [!@lm!@%s!@lg!@]." % MTF_type)
         xar, yar = self._Analysis_GeneralDataSeriesReader_(self.Analyses_RunAnalysesAndGetResults(analysis='FftMtf', analysis_settings=Settings))
         return xar, yar
     freq, mod_y   = _do_mtf_mode_('modulation')
@@ -646,7 +693,7 @@ def Analyses_FFTMTF(
         fields        = [self.Field_GetField(x+1) for x in range(self.Fields_GetNumberOfFields())]
     units         = self.Utilities_GetAllSystemUnits()
     freq_units    = str(units["MTFUnits"])
-    cp("!@lg!@Analyses_FFTMTF :: Done Calculating FFT MTF.")
+    if self._verbose: cp("!@lg!@Analyses_FFTMTF :: Done Calculating FFT MTF.")
     out = xr.Dataset(
     {
         "modulation"                : (("field", 'freq', 'ray_type'), mod_y[1::].astype(float)),
@@ -740,7 +787,7 @@ def Analyses_FFTPSF(
         analysis_settings_obj.UsePolarization                 = use_polarization
         analysis_settings_obj.Normalize                       = use_normalization
         analysis_settings_obj.ImageDelta                      = float(image_delta_microns)
-        cp("!@lg!@Analyses_FFTPSF :: Calculating FFT PSF [!@lm!@%s!@lg!@]..." % PSF_type)  
+        if self._verbose: cp("!@lg!@Analyses_FFTPSF :: Calculating FFT PSF [!@lm!@%s!@lg!@]..." % PSF_type)  
         analysis_obj.ApplyAndWaitForCompletion()
         results = analysis_obj.GetResults()
         results.GetTextFile(self.Utilities_AnalysesFilesDir() + os.sep + "HuygensPSF.txt")
@@ -754,7 +801,7 @@ def Analyses_FFTPSF(
         return gar[0], xar[0], yar[0], info
     out_list = []
     for fieldidx in field:
-        cp(f"!@lg!@Analyses_FFTPSF :: Calculating FFT PSF for field [!@lm!@{fieldidx}!@lg!@].")
+        if self._verbose: cp(f"!@lg!@Analyses_FFTPSF :: Calculating FFT PSF for field [!@lm!@{fieldidx}!@lg!@].")
         ling, x, y, info   = _do_psf_mode_('linear', field_idx=fieldidx)
         logg, _, _, _   = _do_psf_mode_('log', field_idx=fieldidx)
         phaseg, _, _, _   = _do_psf_mode_('phase', field_idx=fieldidx)
@@ -762,7 +809,7 @@ def Analyses_FFTPSF(
         imagg, _, _, _   = _do_psf_mode_('imaginary', field_idx=fieldidx)
         units         = self.Utilities_GetAllSystemUnits()
         lsf_x, lsf_y, esf_x, esf_y = self._Analysis_CalcLsfEsfFrom2DPsf_(psf=ling, x=x, y=y, normalize=True)
-        cp("!@lg!@Analyses_FFTPSF :: Done Calculating FFT PSF.")
+        if self._verbose: cp("!@lg!@Analyses_FFTPSF :: Done Calculating FFT PSF.")
         out_list.append(xr.Dataset(
         {
             "linear"                : (("field", "y", "x"), ling.astype(float)[np.newaxis]),
@@ -963,7 +1010,7 @@ def Analyses_HuygensPSF(
         analysis_settings_obj.Normalize                       = use_normalization
         analysis_settings_obj.UseCentroid                     = use_centroid
         analysis_settings_obj.ImageDelta                      = float(image_delta_microns)
-        cp("!@lg!@Analyses_HuygensPSF :: Calculating Huygens PSF [!@lm!@%s!@lg!@]..." % PSF_type)  
+        if self._verbose: cp("!@lg!@Analyses_HuygensPSF :: Calculating Huygens PSF [!@lm!@%s!@lg!@]..." % PSF_type)  
         analysis_obj.ApplyAndWaitForCompletion()
         results = analysis_obj.GetResults()
         results.GetTextFile(self.Utilities_AnalysesFilesDir() + os.sep + "HuygensPSF.txt")
@@ -975,7 +1022,7 @@ def Analyses_HuygensPSF(
         return gar[0], xar[0], yar[0], info
     out_list = []
     for fieldidx in field:
-        cp(f"!@lg!@Analyses_HuygensPSF :: Calculating PSF for field [!@lm!@{fieldidx}!@lg!@].")
+        if self._verbose: cp(f"!@lg!@Analyses_HuygensPSF :: Calculating PSF for field [!@lm!@{fieldidx}!@lg!@].")
         ling, x, y, info    = _do_psf_mode_('Linear', field_idx=fieldidx)
         logm1g, _, _, _     = _do_psf_mode_('Log_Minus_1', field_idx=fieldidx)
         logm2g, _, _, _     = _do_psf_mode_('Log_Minus_2', field_idx=fieldidx)
@@ -987,7 +1034,7 @@ def Analyses_HuygensPSF(
         imagg, _, _, _      = _do_psf_mode_('imaginary', field_idx=fieldidx)
         units               = self.Utilities_GetAllSystemUnits()
         lsf_x, lsf_y, esf_x, esf_y = self._Analysis_CalcLsfEsfFrom2DPsf_(psf=ling, x=x, y=y, normalize=True)
-        cp("!@lg!@Analyses_HuygensPSF :: Done Calculating PSF.")
+        if self._verbose: cp("!@lg!@Analyses_HuygensPSF :: Done Calculating PSF.")
         out_list.append(xr.Dataset(
         {
             "linear"                : (("field","y", "x"), ling.astype(float)[np.newaxis]),
@@ -1034,9 +1081,34 @@ def Analyses_HuygensPSF(
 
 def Analyses_ImageSimulation(self,
                              input_image_full_path:str=None,
-                             field_height
+                             wavelengths:int | float | ZOSAPI_SystemData_IWavelength = 0,
+                             field_height:float=None,
+                             number_of_pixels_x:int=1280,
+                             number_of_pixels_y:int=1024,
+                             pixel_pitch_mm:float=0.01,
+                             pupil_size: str = "64x64",
+                             image_size: str = "64x64",
+                             psf_x_points:int=15,
+                             psf_y_points:int=15,
+                             use_polarization: bool = True,
+                             use_fixed_apertures: bool = True,
+                             use_relative_illumination: bool = True,
+                             oversampling:int=None, # 2, 4, 8, 16, 32, 64
+                             gaurdband:int=None, # 2, 4, 8, 16, 32, 64
+                             abberations:str='diffraction', # None, geometric, diffraciton
                              ):
-    # Load image for storage in xarray. Need to flipud to both make nice in xarray plot and to make it constsnt with Zemax (TODO check) 
+    # TODO add flipping and rotation, and add field selection (maybe)
+    # TODO add polychormatics image simulation
+    
+    if not (isinstance(wavelengths, int) and wavelengths == 0):
+        wavelengths = np.array([self._convert_raw_wavelength_input_(wavelengths, return_index=True)])
+    else:
+        wavelengths = np.arange(1, self.Wavelength_GetNumberOfWavelengths()+1)
+    
+    # Always have the field be the optical axis
+    field = self._convert_raw_field_input_(self.Fields_AddField(0,0), return_index=True)
+    
+    # Load image for storage in xarray. Need to flipud to both make nice in xarray plot
     if input_image_full_path is None:
         input_image_full_path =  self.Utilities_ZemaxInstallationImageDir() + os.sep + 'ColorChart_Speos_4800x3600.png'
         IMAGE_GIVEN = False
@@ -1045,27 +1117,89 @@ def Analyses_ImageSimulation(self,
     img = Image.open(input_image_full_path)
     input_image_rgb = np.flipud(np.array(img.convert("RGB")))
     input_image_mono = np.flipud(np.array(img.convert("L")))
+    
     if IMAGE_GIVEN:
         # Copy the given image to where Zemax can find it.
         zemax_input_image_file_path = shutil.copy(input_image_full_path, self.Utilities_ZemaxInstallationImageDir())
-    # Configure settings
-    analysis_obj, analysis_settings_obj, analysis_enum    = self._Analysis_GetZOSObjectAndSettings_(analysis='ImageSimulation')
-    analysis_settings_obj                                 = analysis_settings_obj.__implementation__
-    analysis_settings_obj.InputFile                       = str(zemax_input_image_file_path.split(os.sep)[-1])
+    
+    if field_height is None:
+        # Assign such that the image matches the input field/size to fill the detector - based on paraxial magnifcation (values are rounded for this paraixal reason)
+        lens_data = self.Analyses_GetGeneralLensData()
+        if 'height' in self.Field_GetFieldType().lower():
+            field_height = np.round(np.abs(number_of_pixels_y*pixel_pitch_mm*np.round(1/lens_data.ParaxialMagnification,1)),1) 
+        else:
+            # # Use the entrnace pupil and EFL to determine the half angle in deg, 2X this is the full field height of the image
+            field_height = 2*np.round(np.rad2deg(np.arctan(lens_data.EntrancePupilDiameter/(2*lens_data.EffectiveFocalLengthInImageSpace))),2)
+            # # # Make to size of detector
+            # field_height = 2*np.rad2deg(np.arctan((number_of_pixels_y*pixel_pitch_mm/2)/lens_data.EffectiveFocalLengthInImageSpace))
+
+    def _do_sim_(in_wavln:int):
+        if self._verbose: cp(f"!@lg!@Analyses_ImageSimulation :: Simulating image for wavelength [!@lm!@{in_wavln}!@lg!@/!@lm!@{len(wavelengths)}!@lg!@].")
+        # Configure settings
+        analysis_obj, analysis_settings_obj, analysis_enum    = self._Analysis_GetZOSObjectAndSettings_(analysis='ImageSimulation')
+        analysis_settings_obj                                 = analysis_settings_obj.__implementation__
+        analysis_settings_obj.InputFile                       = str(zemax_input_image_file_path.split(os.sep)[-1])
+        analysis_settings_obj.Field.SetFieldNumber(field)
+        if oversampling is None: 
+            analysis_settings_obj.Oversampling                = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.ExtendedScene.ISSamplings, 'None')
+        else: 
+            analysis_settings_obj.Oversampling                = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.ExtendedScene.ISSamplings, f'X{int(oversampling)}')
+        if gaurdband is None: 
+            analysis_settings_obj.GuardBand                   = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.ExtendedScene.ISSamplings, 'None')
+        else: 
+            analysis_settings_obj.GuardBand                   = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.ExtendedScene.ISSamplings, f'X{int(gaurdband)}')
+        analysis_settings_obj.SetWavelengthNumber(int(in_wavln))   
+        analysis_settings_obj.Aberrations               = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.ExtendedScene.ISAberrationTypes, abberations)
+        analysis_settings_obj.PupilSampling             = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.SampleSizes, pupil_size, extra_include_filter="S_")
+        analysis_settings_obj.ImageSampling             = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.SampleSizes, image_size, extra_include_filter="S_")
+        analysis_settings_obj.PSFXPoints                = int(psf_x_points)
+        analysis_settings_obj.PSFYPoints                = int(psf_y_points)
+        analysis_settings_obj.UsePolarization           = bool(use_polarization)
+        analysis_settings_obj.ApplyFixedApertures       = bool(use_fixed_apertures)
+        analysis_settings_obj.UseRelativeIllumination   = bool(use_relative_illumination)
+        analysis_settings_obj.FlipImage                 = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.ExtendedScene.ISFlipTypes, 'None')
+        analysis_settings_obj.FlipSource                = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.ExtendedScene.ISFlipTypes, 'None')
+        analysis_settings_obj.RotationSource            = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.Rotations, '0')
+        analysis_settings_obj.ShowAs                    = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.ExtendedScene.ISShowAsTypes, 'SimulatedImage')
+        analysis_settings_obj.Reference                 = self._CheckIfStringValidInDir_(self.ZOSAPI.Analysis.Settings.ReferenceGia, 'ChiefRay')
+        analysis_settings_obj.PixelSize                 = float(pixel_pitch_mm)
+        analysis_settings_obj.XPixels                   = int(number_of_pixels_x)
+        analysis_settings_obj.YPixels                   = int(number_of_pixels_y)
+        analysis_settings_obj.FieldHeight               = float(field_height)
+        analysis_settings_obj.OutputFile                = self.Utilities_ZemaxInstallationImageDir() + os.sep + 'TEMP.png'
+        analysis_obj.ApplyAndWaitForCompletion()
+        sim_image = np.flipud(np.array(Image.open( self.Utilities_ZemaxInstallationImageDir() + os.sep + 'TEMP.png').convert("L")))
+        os.remove(self.Utilities_ZemaxInstallationImageDir() + os.sep + 'TEMP.png')
+        return sim_image
+    sim_images = []
+    for wvln in wavelengths:
+        sim_images.append(_do_sim_(wvln))
+    # Removed added on-axis field
+    self.Field_DeleteField(field)
     # Make xarray output
     out = xr.Dataset(
         {
-            "input_image_rgb"                : (("input_pix_y", "input_pix_x", "rgb"), input_image_rgb,),
-            "input_image_mono"                : (("input_pix_y", "input_pix_x"), input_image_mono,),
+            "input_image_rgb"                : (("input_y", "input_x", "rgb"), input_image_rgb,),
+            "input_image_mono"               : (("input_y", "input_x"), input_image_mono,),
+            "sim_image_mono"                 : (("wavelength", "y", "x"), sim_images,),
         }, 
         coords={
-            "input_x": (("input_pix_x"), np.arange(0, input_image_mono.shape[1]).astype(int),{'units':'input_pixels'}),
-            "input_y": (("input_pix_y"), np.arange(0, input_image_mono.shape[0]).astype(int),{'units':'input_pixels'}),
+            "input_x"   : (("input_x"), np.arange(0, input_image_mono.shape[1]).astype(int),{'units':'pixels'}),
+            "input_y"   : (("input_y"), np.arange(0, input_image_mono.shape[0]).astype(int),{'units':'pixels'}),
+            "x"         : (("x"), np.arange(0, number_of_pixels_x).astype(int)*pixel_pitch_mm,{'units':'mm'}),
+            "image_x"   : (("x"), np.arange(0, number_of_pixels_x).astype(int),{'units':'pixels'}),
+            "y"         : (("y"), np.arange(0, number_of_pixels_y).astype(int)*pixel_pitch_mm,{'units':'mm'}),
+            "image_y"   : (("y"), np.arange(0, number_of_pixels_y).astype(int),{'units':'pixelsmm'}),
+            "wavelength": (("wavelength"), np.array([self.Wavelength_GetWavelength(x).Wavelength for x in wavelengths]).astype(float), {'units':'micrometers'}),
         },
         attrs={
             'Input_Image_Path'  : str(input_image_full_path),
         }
         )
+    
     if IMAGE_GIVEN:
         # Remove the copied input image from the zemax folder so you don't clutter the lib
         os.remove(zemax_input_image_file_path)
+        
+    return out
+    
