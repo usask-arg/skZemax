@@ -362,7 +362,7 @@ def NCE_GetAllColumnDataOfObject(
 
 
 def NCE_SetAllColumnDataOfObjectFromDict(
-    self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow, ObjectNCE_dict: dict|Box
+    self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow, ObjectNCE_dict: dict | Box
 ) -> None:
     """
     Sets all column data of a Non-Sequential object from a dict.

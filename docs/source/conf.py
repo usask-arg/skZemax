@@ -17,8 +17,15 @@ import os
 if os.environ.get("READTHEDOCS") == "True":
     nb_execution_mode = "off"
 else:
-    nb_execution_mode = "auto"   # or "cache" 
-autodoc_mock_imports = ["pythonnet", "clr", "winreg", "ZOSAPI_NetHelper", "ZOSAPI", "System"]
+    nb_execution_mode = "auto"  # or "cache"
+autodoc_mock_imports = [
+    "pythonnet",
+    "clr",
+    "winreg",
+    "ZOSAPI_NetHelper",
+    "ZOSAPI",
+    "System",
+]
 
 
 # release: str = get_version(project)

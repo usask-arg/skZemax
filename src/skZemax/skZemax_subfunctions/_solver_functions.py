@@ -5,7 +5,7 @@ from box import Box
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._ZOSAPI_interface_functions import (
-    __LowLevelZemaxStringCheck__, _CheckIfStringValidInDir_
+    __LowLevelZemaxStringCheck__,
 )
 
 type ZOSAPI_Editors_LDE_ILDERow = object  # <- ZOSAPI.Editors.LDE.ILDERow # The actual module is referenced by the base PythonStandaloneApplication class.
@@ -15,7 +15,9 @@ type ZOSAPI_Editors_MCE_IMCERow = object  # <- ZOSAPI.Editors.MCE.IMCERow # The 
 ######################################################
 # Optimization Functions
 ######################################################
-def Solver_QuickFocus(self, criterion:str="SpotSizeRadial", use_centroid:bool=True) -> None:
+def Solver_QuickFocus(
+    self, criterion: str = "SpotSizeRadial", use_centroid: bool = True
+) -> None:
     """Invokes the Zemax QuickFocus optimization. This adjusts the back focal distance for best focus.
 
     :param criterion: criterion for the focus. Options are: SpotSizeRadial, SpotSizeXOnly, SpotSizeYOnly, RMSWavefront. Defaults to "SpotSizeRadial"
@@ -24,12 +26,21 @@ def Solver_QuickFocus(self, criterion:str="SpotSizeRadial", use_centroid:bool=Tr
     :type use_centroid: bool, optional
     """
     quickFocus = self.TheSystem.Tools.OpenQuickFocus()
-    quickFocus.Criterion = self._CheckIfStringValidInDir_(self.ZOSAPI.Tools.General.QuickFocusCriterion, criterion)
+    quickFocus.Criterion = self._CheckIfStringValidInDir_(
+        self.ZOSAPI.Tools.General.QuickFocusCriterion, criterion
+    )
     quickFocus.UseCentroid = use_centroid
     quickFocus.RunAndWaitForCompletion()
     quickFocus.Close()
 
-def Solver_QuickAdjust(self, adjust_surface: int | ZOSAPI_Editors_LDE_ILDERow, evaluate_surface: int | ZOSAPI_Editors_LDE_ILDERow, criterion:str="SpotSizeRadial", optimize_thickness:bool=True) -> None:
+
+def Solver_QuickAdjust(
+    self,
+    adjust_surface: int | ZOSAPI_Editors_LDE_ILDERow,
+    evaluate_surface: int | ZOSAPI_Editors_LDE_ILDERow,
+    criterion: str = "SpotSizeRadial",
+    optimize_thickness: bool = True,
+) -> None:
     """Invokes the Zemax QuickAdjust optimization. Similar to :func:`Solver_QuickFocus` but adjusts any radius or thickness to achieve best transverse or angular ray focus evaluated at any subsequent surface.
 
     :param adjust_surface: The surface to adjust in the optimization.
@@ -41,14 +52,24 @@ def Solver_QuickAdjust(self, adjust_surface: int | ZOSAPI_Editors_LDE_ILDERow, e
     :param optimize_thickness: Quick adjust can only optimize either the radius or the thickness of the adjust_surface. If this is true the thickness is optimized, else it is the radius. Defaults to True (surface thickness property)
     :type optimize_thickness: bool, optional
     """
-    quickAdjust                 = self.TheSystem.Tools.OpenQuickAdjust()
-    quickAdjust.AdjustSurface   = self._convert_raw_surface_input_(adjust_surface, return_index=True)
-    quickAdjust.EvaluateSurface = self._convert_raw_surface_input_(evaluate_surface, return_index=True)
-    quickAdjust.Criterion       = self._CheckIfStringValidInDir_(self.ZOSAPI.Tools.General.QuickAdjustCriterion, criterion)
+    quickAdjust = self.TheSystem.Tools.OpenQuickAdjust()
+    quickAdjust.AdjustSurface = self._convert_raw_surface_input_(
+        adjust_surface, return_index=True
+    )
+    quickAdjust.EvaluateSurface = self._convert_raw_surface_input_(
+        evaluate_surface, return_index=True
+    )
+    quickAdjust.Criterion = self._CheckIfStringValidInDir_(
+        self.ZOSAPI.Tools.General.QuickAdjustCriterion, criterion
+    )
     if optimize_thickness:
-        quickAdjust.SurfaceParameter = self._CheckIfStringValidInDir_(self.ZOSAPI.Tools.General.QuickAdjustType, "Thickness")
+        quickAdjust.SurfaceParameter = self._CheckIfStringValidInDir_(
+            self.ZOSAPI.Tools.General.QuickAdjustType, "Thickness"
+        )
     else:
-        quickAdjust.SurfaceParameter = self._CheckIfStringValidInDir_(self.ZOSAPI.Tools.General.QuickAdjustType, "Radius")
+        quickAdjust.SurfaceParameter = self._CheckIfStringValidInDir_(
+            self.ZOSAPI.Tools.General.QuickAdjustType, "Radius"
+        )
     quickAdjust.RunAndWaitForCompletion()
     quickAdjust.Close()
 
@@ -163,6 +184,27 @@ def Solver_LDEMakeSurfacePropertyFixed(
     ).MakeSolveFixed()
 
 
+def Solver_LDEMakeSurfacePropertyAutomatic(
+    self, in_surface: int | ZOSAPI_Editors_LDE_ILDERow, propty: str
+):
+    """
+    Sets the property of the surface to be automatic. This isn't available for all surface properties, and is intdened to be used on
+    properties like "Semi-Diameter" to have them be automatically calculated.
+
+    :param in_surface: The surface to set - either an index or object.
+    :type in_surface: Union[int, ZOSAPI_Editors_LDE_ILDERow]
+    :param propty: A string identifying the property to make variable - this will be one of the object's column properties (keys in dict of :func:`LDE_GetAllColumnDataOfSurface`).
+    :type propty: str
+    """
+    in_surface = self._convert_raw_surface_input_(in_surface, return_index=False)
+    cell = in_surface.GetCellAt(int(self.LDE_GetSurfaceColumnEnum(propty, in_surface)))
+    try:
+        # If the property can't be set to automatic this should should crash, instead just move on.
+        cell.SetSolveData(cell.CreateSolveType(self.ZOSAPI.Editors.SolveType.Automatic))
+    except:
+        pass
+
+
 def Solver_GetNamesOfAllSolveTypes(
     self,
     print_to_console: bool = False,
@@ -271,7 +313,7 @@ def Solver_LDESurfaceProperty_ForValue(
     in_surface: int | ZOSAPI_Editors_LDE_ILDERow,
     property: str | int,
     solve_type: str,
-    params: dict|Box,
+    params: dict | Box,
 ):
     """
     Solves the property of the surface for a the parameters of the solve type.
@@ -348,7 +390,7 @@ def Solver_MCEMakeConfigOp_ForValue(
     in_op: int | ZOSAPI_Editors_MCE_IMCERow,
     config_number: int,
     solve_type: str,
-    params: dict|Box,
+    params: dict | Box,
 ) -> ZOSAPI_Editors_MCE_IMCERow:
     """
     Sets the property property of the ZOSAPI_Editors_MCE_IMCERow (MCE operand) for the configuration number to a solve for value.

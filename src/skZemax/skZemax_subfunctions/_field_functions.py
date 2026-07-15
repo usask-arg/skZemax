@@ -115,7 +115,7 @@ def Field_GetAllDataOfField(self, in_field: int | ZOSAPI_SystemData_IField) -> B
 
 
 def Field_SetAllDataOfFieldFromDict(
-    self, in_field: int | ZOSAPI_SystemData_IField, Field_dict: dict|Box
+    self, in_field: int | ZOSAPI_SystemData_IField, Field_dict: dict | Box
 ) -> None:
     """
     Sets all column data of a Field object and returns it as a dict.

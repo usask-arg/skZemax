@@ -184,6 +184,7 @@ class skZemaxClass(PythonStandaloneApplication):
         Solver_HammerOptimization,
         Solver_LDEMakeSurfacePropertyFixed,
         Solver_LDEMakeSurfacePropertyVariable,
+        Solver_LDEMakeSurfacePropertyAutomatic,
         Solver_LDESurfaceProperty_ForValue,
         Solver_LocalOptimization,
         Solver_MCEMakeConfigOp_ForValue,
