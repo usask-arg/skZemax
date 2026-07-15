@@ -905,6 +905,7 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
     | np.ndarray[int, float, ZOSAPI_SystemData_IWavelength] = None,
     ray_type: str = "Real",
     OPD_mode: str = "None",
+    should_take_rays_one_to_one:bool=False,
     should_meshgrid_Hxy: bool = False,
     should_meshgrid_Pxy: bool = True,
 ) -> xr.Dataset:
@@ -997,13 +998,21 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
     :type ray_type: str, optional
     :param OPD_mode: The type of OPD scheme to apply (see desciprtion above), defaults to 'None'
     :type OPD_mode: str, optional
-    :param should_meshgrid_Hxy: If True the two arrays of Hx and Hy will be used with np.meshgrid, else the two arrays will be taken as is to define the Hx and Hy points, defaults to False
+    :param should_take_rays_one_to_one: If True the supplied Hx, Hy, Px, and Py must be the same length and each element will define a single ray. All H and P meshgridding will be disabled. If False, every Hx/Hy pair will be used with every Px/Py pair (multipule rays may be built from the same Hx/Hy position) and meshgridding may be used, defaults to False.
+    :type should_take_rays_one_to_one: bool, optional
+    :param should_meshgrid_Hxy: Ignored if should_take_rays_one_to_one==True. If True the two arrays of Hx and Hy will be used with np.meshgrid, else the two arrays will be taken as is to define the Hx and Hy points, defaults to False.
     :type should_meshgrid_Hxy: bool, optional
-    :param should_meshgrid_Pxy: If True the two arrays of Px and Py will be used with np.meshgrid, else the two arrays will be taken as is to define the Px and Py points, defaults to True
+    :param should_meshgrid_Pxy: Ignored if should_take_rays_one_to_one==True. If True the two arrays of Px and Py will be used with np.meshgrid, else the two arrays will be taken as is to define the Px and Py points, defaults to True
     :type should_meshgrid_Pxy: bool, optional
     :return: An xarray of rays ready to be traced by :func:`LDE_RunRayTrace`
     :rtype: xr.Dataset
     """
+    if should_take_rays_one_to_one:
+        should_meshgrid_Hxy=False
+        should_meshgrid_Pxy=False
+        if not np.all([len(x) == len(Hx)  for x in [Hy, Px, Py]]):
+            cp('!@lr!@LDE_BuildRayTraceNormalizedUnpolarizedRays :: Expecting Hx, Hy, Px, and Py inputs to expcitly define rays, but they are not the same length.')
+            return None
     if ending_surface is None:
         ending_surface = self.LDE_GetNumberOfSurfaces() - 1
     else:
@@ -1081,10 +1090,16 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
         PX = np.atleast_2d(Px)
         PY = np.atleast_2d(Py)
     HX, HY, PX, PY = _check_bounds_(HX, HY, PX, PY)
-    HXarray = np.repeat(HX, PX.shape[0]).astype(float)
-    HYarray = np.repeat(HY, PX.shape[0]).astype(float)
-    PXarray = np.tile(PX, HX.shape[0]).astype(float)
-    PYarray = np.tile(PY, HX.shape[0]).astype(float)
+    if not should_take_rays_one_to_one:
+        HXarray = np.repeat(HX, PX.shape[0]).astype(float)
+        HYarray = np.repeat(HY, PX.shape[0]).astype(float)
+        PXarray = np.tile(PX, HX.shape[0]).astype(float)
+        PYarray = np.tile(PY, HX.shape[0]).astype(float)
+    else:
+        HXarray = HX
+        HYarray = HY
+        PXarray = PX
+        PYarray = PY
     return xr.Dataset(
         {
             "Hx": ("ray", HXarray),
