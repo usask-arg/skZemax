@@ -1010,7 +1010,7 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
     if should_take_rays_one_to_one:
         should_meshgrid_Hxy=False
         should_meshgrid_Pxy=False
-        if not np.all([len(x) == len(Hx)  for x in [Hy, Px, Py]]):
+        if not np.all([np.shape(x) == np.shape(Hx)  for x in [Hy, Px, Py]]):
             cp('!@lr!@LDE_BuildRayTraceNormalizedUnpolarizedRays :: Expecting Hx, Hy, Px, and Py inputs to expcitly define rays, but they are not the same length.')
             return None
     if ending_surface is None:
@@ -1065,6 +1065,7 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
     ]
 
     def _check_bounds_(in_hx, in_hy, in_px, in_py):
+        shp = in_hx.shape  # should be all the same
         in_hx = in_hx[np.abs(in_hx) <= 1]
         in_hy = in_hy[np.abs(in_hy) <= 1]
         if "Rect" not in Field_GetNormalization(self):
@@ -1077,6 +1078,13 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
         radius = np.sqrt(in_px**2 + in_py**2)
         in_px = in_px[radius <= 1]
         in_py = in_py[radius <= 1]
+        
+        # put them back to the original shape
+        in_hx = np.reshape(in_hx, shp)
+        in_hy = np.reshape(in_hy, shp)
+        in_px = np.reshape(in_px, shp)
+        in_py = np.reshape(in_py, shp)
+        
         return in_hx, in_hy, in_px, in_py
 
     if should_meshgrid_Hxy:
@@ -1100,12 +1108,19 @@ def LDE_BuildRayTraceNormalizedUnpolarizedRays(
         HYarray = HY
         PXarray = PX
         PYarray = PY
+
+    # add dummy row for the primary wavelength
+    HXarray = np.vstack([HXarray[0], HXarray])
+    HYarray = np.vstack([HYarray[0], HYarray])
+    PXarray = np.vstack([PXarray[0], PXarray])
+    PYarray = np.vstack([PYarray[0], PYarray])
+
     return xr.Dataset(
         {
-            "Hx": ("ray", HXarray),
-            "Hy": ("ray", HYarray),
-            "Px": ("ray", PXarray),
-            "Py": ("ray", PYarray),
+            "Hx": (("wvln", "ray"), HXarray),
+            "Hy": (("wvln", "ray"), HYarray),
+            "Px": (("wvln", "ray"), PXarray),
+            "Py": (("wvln", "ray"), PYarray),
         },
         coords={
             "wavelengths": (
@@ -1240,17 +1255,17 @@ def _run_NormUnPol_raytrace_(
     ray_trace_rays = ray_trace_rays.assign(
         {
             "pupil_apodization": (
-                ("ray"),
+                ("wvln", "ray"),
                 np.array(
                     [
                         float(self.TheSystem.LDE.GetApodization(x, y))
                         for x, y in zip(
-                            ray_trace_rays.Px.values,
-                            ray_trace_rays.Py.values,
+                            ray_trace_rays.Px.values.flatten(),
+                            ray_trace_rays.Py.values.flatten(),
                             strict=False,
                         )
                     ]
-                ),
+                ).reshape(ray_trace_rays.Px.values.shape),
             )
         }
     )
@@ -1322,11 +1337,11 @@ def _run_NormUnPol_raytrace_(
             dataReader.ClearData()
             for wvlenidx in range(self.Wavelength_GetNumberOfWavelengths()):
                 dataReader.AddRay(
-                    int(wvlenidx + 1),
-                    ray_trace_rays.Hx.values,
-                    ray_trace_rays.Hy.values,
-                    ray_trace_rays.Px.values,
-                    ray_trace_rays.Py.values,
+                    int(wvlenidx),
+                    ray_trace_rays.Hx.values[wvlenidx],
+                    ray_trace_rays.Hy.values[wvlenidx],
+                    ray_trace_rays.Px.values[wvlenidx],
+                    ray_trace_rays.Py.values[wvlenidx],
                     _CheckIfStringValidInDir_(
                         self,
                         self.ZOSAPI.Tools.RayTrace.OPDMode,
