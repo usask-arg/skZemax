@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 import xarray as xr
 from box import Box
+import copy
 
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 from skZemax.skZemax_subfunctions._field_functions import Field_GetNormalization
@@ -591,7 +592,6 @@ def LDE_GetSurfaceColumnEnum(
     :return: the ZOI-API enumerator
     :rtype: ZOSAPI_Editors_LDE_SurfaceColumn
     """
-
     if in_Surface is None or "par" in in_str.lower():
         return self._CheckIfStringValidInDir_(
             self.ZOSAPI.Editors.LDE.SurfaceColumn, in_str
@@ -599,7 +599,15 @@ def LDE_GetSurfaceColumnEnum(
     surface_column_calls, surface_columns = self._LDE_GetSurfaceCalls_(
         self._convert_raw_surface_input_(in_Surface, return_index=False)
     )
-    bool_mask = [in_str.lower() in x.Header.lower() for x in surface_column_calls]
+    column_names_lower = [x.Header.lower() for x in surface_column_calls]
+    if "semi-di" in in_str.lower() and 'mech' not in in_str.lower():
+        # Handle the case where clear semi-diameter has a different name depending on the type of aperture.
+        if np.any(['clear semi-dia' in x for x in column_names_lower]):
+            in_str = 'clear semi-dia'
+        else:
+            in_str = 'semi-diameter'
+
+    bool_mask = [in_str.lower() in x for x in column_names_lower]
     if np.any(bool_mask):
         return self._CheckIfStringValidInDir_(
             self.ZOSAPI.Editors.LDE.SurfaceColumn,
@@ -666,6 +674,13 @@ def LDE_SetAllColumnDataOfSurfaceFromDict(
     surfacecolumn_calls, _surface_columns = self._LDE_GetSurfaceCalls_(
         self._convert_raw_surface_input_(in_Surface, return_index=False)
     )
+    SurfaceLDE_dict = copy.deepcopy(SurfaceLDE_dict)
+    # Handle the case where clear semi-diameter has a different name depending on the type of aperture.
+    # Do this by just duplicating the entry in the dict. scall.Header should still pick out the right one.
+    if 'Semi-Diameter' in SurfaceLDE_dict:
+        SurfaceLDE_dict['Clear Semi-Dia'] = SurfaceLDE_dict['Semi-Diameter']
+    elif 'Clear Semi-Dia' in SurfaceLDE_dict:
+        SurfaceLDE_dict['Semi-Diameter'] = SurfaceLDE_dict['Clear Semi-Dia']
     for scall in surfacecolumn_calls:
         if "(unused)" in scall.Header and "Par 0" not in scall.Header:
             break  # Everything after this should be empty
