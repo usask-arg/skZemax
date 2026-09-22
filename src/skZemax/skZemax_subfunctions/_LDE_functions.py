@@ -256,6 +256,18 @@ def LDE_GetApertureTypeSettings(
         return None
     return settings
 
+def LDE_ChangeApertureToNone(self,
+    in_Surface: int | ZOSAPI_Editors_LDE_ILDERow,):
+    """ Changes the aperture of the surface to 'None'. I.e it is not an aperture.
+    :param in_Surface: The surface to change as an object or as an index.
+    :type in_Surface: int | ZOSAPI_Editors_LDE_ILDERow
+    :return: The surface object.
+    :rtype: ZOSAPI_Editors_LDE_ILDERow
+    """
+    SurfaceLDE = self._convert_raw_surface_input_(in_Surface, return_index=False)
+    settings = self.LDE_GetApertureTypeSettings(in_Surface=SurfaceLDE, aperture_type="None" )
+    SurfaceLDE.ApertureData.ChangeApertureTypeSettings(settings)
+    return SurfaceLDE
 
 def LDE_ChangeApertureToRectangular(
     self,

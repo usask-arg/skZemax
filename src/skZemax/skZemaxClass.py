@@ -88,6 +88,7 @@ class skZemaxClass(PythonStandaloneApplication):
         LDE_ChangeApertureToCircular,
         LDE_ChangeApertureToCircularObscuration,
         LDE_ChangeApertureToFloating,
+        LDE_ChangeApertureToNone,
         LDE_ChangeApertureToRectangular,
         LDE_ChangeSurfaceType,
         LDE_CheckIfSurfaceIsStop,
