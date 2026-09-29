@@ -159,17 +159,96 @@ def parse_description(in_buffer_generator:Generator[bytes, int, None])->Box:
     out.DataReferenceToLightSourceGeometry        = decode_str(buffer_contents[8])
     return out
 
-def parse_spectral_tables(in_buffer_generator:Generator[bytes, int, None])->Box:
-    pass
+def parse_spectral_tables(in_buffer_generator:Generator[bytes, int, None], header_and_flags:Box)->Box:
+    """This function will parse all spectral tables within the TM25RAY file (if any are present). 
+    Error checking is done as the tables are read, and the binary buffer is advanced to the end of this block.
 
-# buffer_generator        = read_binary_block(r"C:\Users\dsl935\Documents\Zemax\Objects\Sources\Source Files\test.tm25ray")
-buffer_generator    = read_binary_block(r"C:\Users\dsl935\Documents\Zemax\Objects\Sources\Source Files\testspect.tm25ray")
+    :param in_buffer_generator:  A generator to produce binary data. It should be set to start reading after :func:`parse_description`.
+    :type in_buffer_generator: Generator[bytes, int, None]
+    :param header_and_flags: The output of :func:`parse_header_and_flags`
+    :type header_and_flags: Box
+    :return: A Box of the spectral table data formatted as out['SpectralTable{#}] = Box({Wavelengths: np.ndarray, RelativeWeight: np.ndarray}). If no spectral table data is in the file an empty Box is returned.
+    :rtype: Box
+    """
+    def _parse_table_():
+        num_data_pairs= struct.unpack(
+            "<i",
+            in_buffer_generator.send(4)
+        )[0]
+        data_table = struct.unpack(
+            f"<{num_data_pairs*2}f",
+            in_buffer_generator.send(num_data_pairs*2*4)
+        )
+        if num_data_pairs <= 0:
+            raise Exception(f'Spectral table {idx+1} returned a zero or negative number of data paris.') 
+        table_out = Box({})
+        table_out.Wavelengths = np.asarray(data_table[::2])
+        table_out.RelativeWeight = np.asarray(data_table[1::2])
+        if np.any(table_out.Wavelengths<= 0)  or np.any(table_out.RelativeWeight<= 0):
+            raise Exception(f'Found zero or negative wavelengths or relative weights in spectral table {idx+1}.') 
+        return table_out, (num_data_pairs*2*4) + 4
+
+    out = Box({})
+    if not np.isnan(header_and_flags.NumberOfSpectralTables) and header_and_flags.NumberOfSpectralTables > 0 and (header_and_flags.SpectralDataIdentifier == 3 or header_and_flags.SpectralDataIdentifier == 4):
+        total_bytes_read = 0
+        for idx in range(header_and_flags.NumberOfSpectralTables):
+            out[f'SpectralTable{idx+1}'], bytes_read = _parse_table_()
+            total_bytes_read += bytes_read
+        # Advance the buffer past the padding added to the end of the spectral table.
+        # (the total spectral table block should be a number of bytes which is a multiple of 32 by definition).
+        padding = struct.unpack(
+                f"<{(total_bytes_read%32)}i",
+                in_buffer_generator.send(
+                (total_bytes_read%32)*4)
+            )
+        if len(padding)>1 and int(np.sum(np.abs(padding)))>0:
+            raise Exception('Found non-zero data in the expected spectral table padding.') 
+    return out
+
+def parse_additional_ray_data_column_labels(in_buffer_generator:Generator[bytes, int, None], header_and_flags:Box)->Box:
+    """This function parses the block of the TM25RAY file that lists the labels of any additional ray data.
+
+    :param in_buffer_generator: A generator to produce binary data. It should be set to start reading after :func:`parse_spectral_tables`.
+    :type in_buffer_generator: Generator[bytes, int, None]
+    :param header_and_flags: The output of :func:`parse_header_and_flags`
+    :type header_and_flags: Box
+    :return: A Box containing the list of column names. If there are no column names this Box contains an empty list
+    :rtype: Box
+    """
+    out = Box({})
+    out.AdditionalRayDataColumnLabels = [decode_str(struct.unpack("<512s", in_buffer_generator.send(512))[0]) for x in range(header_and_flags.NumberOfAdditionalRayDataItemsPerRay)]
+    return out
+
+def parse_additional_text_block(in_buffer_generator:Generator[bytes, int, None], header_and_flags:Box)->Box:
+    """Parses any additional text in the TM25RAY file.
+
+    :param in_buffer_generator:  A generator to produce binary data. It should be set to start reading after :func:`parse_additional_ray_data_column_labels`.
+    :type in_buffer_generator: Generator[bytes, int, None]
+    :param header_and_flags:  The output of :func:`parse_header_and_flags`
+    :type header_and_flags: Box
+    :raises Exception: SizeOfAdditionalTextBlock % 32 != 0
+    :return: The additional text in a Box under the field 'AdditionalTextBlock'. If there is no additional text then '' is in this field.
+    :rtype: Box
+    """
+    out = Box({})
+    if header_and_flags.SizeOfAdditionalTextBlock % 32 != 0:
+        raise Exception('Size of additional text block is not a multiple of 32.')
+    out.AdditionalTextBlock = decode_str(struct.unpack(f"<{header_and_flags.SizeOfAdditionalTextBlock}s", in_buffer_generator.send(header_and_flags.SizeOfAdditionalTextBlock))[0])
+    return out
+
+
+buffer_generator        = read_binary_block(r"C:\Users\dsl935\Documents\Zemax\Objects\Sources\Source Files\test.tm25ray")
+# buffer_generator    = read_binary_block(r"C:\Users\dsl935\Documents\Zemax\Objects\Sources\Source Files\testspect.tm25ray")
+# buffer_generator    = read_binary_block(r"C:\Users\dsl935\Downloads\rayfile_LERTDUW_S2WP_blue_100k_20161013_IES_TM25.tm25ray")
 next(buffer_generator)  # start the generator
-header_and_flags    = parse_header_and_flags(buffer_generator)
-description         = parse_description(buffer_generator)
-if not np.isnan(header_and_flags.NumberOfSpectralTables) and header_and_flags.NumberOfSpectralTables > 0 and (header_and_flags.SpectralDataIdentifier == 3 or header_and_flags.SpectralDataIdentifier == 4):
-    parse_spectral_tables(buffer_generator)
-if header_and_flags.SizeOfAdditionalTextBlock > 0 and header_and_flags.SizeOfAdditionalTextBlock % 32 == 0:
-    pass
+header_and_flags        = parse_header_and_flags(in_buffer_generator=buffer_generator)
+description             = parse_description(in_buffer_generator=buffer_generator)
+spectral_tables         = parse_spectral_tables(in_buffer_generator=buffer_generator, header_and_flags=header_and_flags)
+additional_ray_labels   = parse_additional_ray_data_column_labels(in_buffer_generator=buffer_generator, header_and_flags=header_and_flags)
+additional_text_block   = parse_additional_text_block(in_buffer_generator=buffer_generator, header_and_flags=header_and_flags)
+
+a = 1
+
+    
 
 a = 1
