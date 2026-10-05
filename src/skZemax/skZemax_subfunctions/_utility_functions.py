@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import inspect
 import os
 import sys
@@ -68,6 +69,15 @@ def Utilities_ZemaxInstallationCADObjectDir(self) -> str:
     return self.TheApplication.ObjectsDir + os.sep + "CAD Files"
 
 
+def Utilities_ZemaxInstallationSourceDir(self) -> str:
+    """
+    Returns directory of the default Zemax CAD object (.stp , .stl , .igs) files given with the installation.
+
+    :return: Path to dir.
+    :rtype: str
+    """
+    return self.TheApplication.ObjectsDir + os.sep + "Sources" + os.sep + "Source Files"
+
 def Utilities_ZemaxInstallationImageDir(self) -> str:
     """
     Returns directory of the default Zemax images (.png , .bmp , .ima) files given with the installation.
@@ -85,27 +95,8 @@ def Utilities_skZemaxExampleDir(self) -> str:
     :return: Path to dir.
     :rtype: str
     """
-    pythondir = os.path.abspath(
-        os.sep.join(
-            os.path.abspath(inspect.getfile(Utilities_skZemaxExampleDir)).split(os.sep)[
-                0:-1
-            ]
-        )
-        + os.sep
-        + ".."
-        + os.sep
-        + ".."
-        + os.sep
-        + ".."
-        + os.sep
-        + "docs"
-        + os.sep
-        + "source"
-        + os.sep
-        + "Examples"
-    )
-    if not os.path.exists(pythondir):
-        os.makedirs(pythondir)
+    pythondir = Path(__file__).parent.parent.parent.parent / 'docs' / 'source' / 'Examples'
+    pythondir.mkdir(parents=True, exist_ok=True)
     return pythondir
 
 
@@ -118,20 +109,8 @@ def Utilities_ConfigFilesDir(self) -> str:
     :return: Path to dir.
     :rtype: str
     """
-    cnfdir = os.path.abspath(
-        os.sep.join(
-            os.path.abspath(inspect.getfile(Utilities_ConfigFilesDir)).split(os.sep)[
-                0:-1
-            ]
-        )
-        + os.sep
-        + ".."
-        + os.sep
-        + "ZemaxConfigFiles"
-    )
-    # creates a new directory
-    if not os.path.exists(cnfdir):
-        os.makedirs(cnfdir)
+    cnfdir = Path(__file__).parent.parent / 'ZemaxConfigFiles' 
+    cnfdir.mkdir(parents=True, exist_ok=True)
     return cnfdir
 
 
@@ -142,20 +121,8 @@ def Utilities_DetectorFilesDir(self) -> str:
     :return: Absolute path to the detector files directory.
     :rtype: str
     """
-    cnfdir = os.path.abspath(
-        os.sep.join(
-            os.path.abspath(inspect.getfile(Utilities_DetectorFilesDir)).split(os.sep)[
-                0:-1
-            ]
-        )
-        + os.sep
-        + ".."
-        + os.sep
-        + "ZemaxDetectorFiles"
-    )
-    # creates a new directory
-    if not os.path.exists(cnfdir):
-        os.makedirs(cnfdir)
+    cnfdir = Path(__file__).parent.parent / 'ZemaxDetectorFiles' 
+    cnfdir.mkdir(parents=True, exist_ok=True)
     return cnfdir
 
 
@@ -166,20 +133,8 @@ def Utilities_AnalysesFilesDir(self) -> str:
     :return: Absolute path to the analysis files directory.
     :rtype: str
     """
-    cnfdir = os.path.abspath(
-        os.sep.join(
-            os.path.abspath(inspect.getfile(Utilities_DetectorFilesDir)).split(os.sep)[
-                0:-1
-            ]
-        )
-        + os.sep
-        + ".."
-        + os.sep
-        + "ZemaxAnalysesFiles"
-    )
-    # creates a new directory
-    if not os.path.exists(cnfdir):
-        os.makedirs(cnfdir)
+    cnfdir = Path(__file__).parent.parent / 'ZemaxAnalysesFiles' 
+    cnfdir.mkdir(parents=True, exist_ok=True)
     return cnfdir
 
 

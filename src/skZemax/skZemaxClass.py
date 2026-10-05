@@ -222,6 +222,7 @@ class skZemaxClass(PythonStandaloneApplication):
         Utilities_SaveZemaxFileAs,
         Utilities_skZemaxExampleDir,
         Utilities_ZemaxInstallationCADObjectDir,
+        Utilities_ZemaxInstallationSourceDir,
         Utilities_ZemaxInstallationCoatingDir,
         Utilities_ZemaxInstallationExampleDir,
         Utilities_ZemaxInstallationImageDir,
