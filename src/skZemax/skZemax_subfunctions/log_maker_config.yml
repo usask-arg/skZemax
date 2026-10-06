@@ -1,0 +1,7 @@
+# Controls the logging level of the logging package.
+# Logging modules are the keys, and logging level are the entries.
+#
+# The entries below are all case insensitive, both in key and entry.
+# The keys are enforced lower case when the yaml is loaded and the entries are compare with upper case.
+#
+skZemax    : 'debug'

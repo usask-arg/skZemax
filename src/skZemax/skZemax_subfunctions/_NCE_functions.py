@@ -103,7 +103,7 @@ def NCE_RunRayTrace(
     SaveRays: bool = False,
     SavePaths: bool = False,
     NumberOfCores: int | None = None,  # If None will set to max number of cores.
-    SaveFileName: str = "NCERayTrace.ZDR",
+    SaveFileName: str = "2-SkZemaxRayTrace.TM25RAY",
 ) -> None:
     """
     Runs a non-sequential ray trace. See the Zemax help pdf section 4.2.1. Ray Trace for more information.
@@ -130,13 +130,15 @@ def NCE_RunRayTrace(
     :type SavePaths: bool, optional
     :param NumberOfCores: The number of computer cores to use in the ray trace. None will use all available cores, defaults to None
     :type NumberOfCores: int, optional
+    :param SaveFileName: Filename to save ray and path information as. If saving a TM25RAY file, the name must be of format "OBJECT#-FILENAME.TM25RAY". The object number is stripped for the filename and the rays saved are defined at that surface, defaults to "2-SkZemaxRayTrace.TM25RAY".
+    :type SaveFileName: bool, optional
     """
     if NumberOfCores is None:
         import multiprocessing
 
         NumberOfCores = multiprocessing.cpu_count()
-    if ".ZDR" not in SaveFileName:
-        SaveFileName += ".ZDR"
+    if ".zdr" not in SaveFileName.lower() and "tm25ray" not in SaveFileName.lower():
+        SaveFileName += ".TM25RAY"
     NSCRayTrace = self.TheSystem.Tools.OpenNSCRayTrace()
     NSCRayTrace.SplitNSCRays = SplitNSCRays
     NSCRayTrace.ScatterNSCRays = ScatterNSCRays
@@ -144,8 +146,10 @@ def NCE_RunRayTrace(
     NSCRayTrace.IgnoreErrors = IgnoreErrors
     NSCRayTrace.NumberOfCores = NumberOfCores
     NSCRayTrace.SavePaths = SavePaths
-    NSCRayTrace.SavePathsFile = SaveFileName.replace(
+    NSCRayTrace.SavePathsFile = SaveFileName.split('-')[-1].replace(
         "ZDR", "PAF"
+    ).replace(
+        "tm25ray", "PAF"
     )  # Should only be used by Zemax if SavePaths==True
     NSCRayTrace.SaveRays = SaveRays
     NSCRayTrace.SaveRaysFile = (

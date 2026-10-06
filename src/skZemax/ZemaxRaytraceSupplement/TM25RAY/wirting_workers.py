@@ -5,7 +5,6 @@ import pandas as pd
 from typing import Generator
 from skZemax.ZemaxRaytraceSupplement.TM25RAY.reading_and_writeing_workers import _header_and_flags_error_checking_
 
-
 def _write_binary_block_(filename: str) -> Generator[None, bytes | int, None]:
     """Construct a generator for writing binary data.
 
@@ -75,7 +74,7 @@ def _encode_str_(in_str: str, size_bytes: int, format: str = "utf-32",
 
 
 def _define_ray_block_contents_from_ray_info_(RayData:pd.DataFrame, SpectralTables:pd.DataFrame=pd.DataFrame(), AdditionalTextBlock:str='')->Box:
-    """This is a worker function for writing TM25RAY files (:func:`write_TM25RAY_file`). 
+    """This is a worker function for writing TM25RAY files (:func:`TM25RAY_write_file`). 
     This function looks at a pd.DataFrame expected to hold ray information following the TM25RAY descriptions i.e. a format of:
 
     +-----------+----------+----------+----------+--------------------+-------------------+
@@ -417,7 +416,7 @@ def _write_ray_data_(in_buffer_generator:Generator[bytes, int, None],  RayData:p
 
     ...where n is the total number of rays (index from zero). The number of columns are variables depending on the content of the TM25RAY file.
 
-    :param in_buffer_generator: A generator to produce binary data. It should be set to after the writing of the additional text block in :func:`write_TM25RAY_file`
+    :param in_buffer_generator: A generator to produce binary data. It should be set to after the writing of the additional text block in :func:`TM25RAY_write_file`
     :type in_buffer_generator: Generator[bytes, int, None]
     :param RayData: As defined above.
     :type RayData: pd.DataFrame
@@ -429,3 +428,132 @@ def _write_ray_data_(in_buffer_generator:Generator[bytes, int, None],  RayData:p
                 *data_to_write
             )
     in_buffer_generator.send(buffer)
+
+def _rot_about_arb_axis_(
+    rot_axis: np.ndarray,
+    vec_to_rot: np.ndarray,
+    angle_deg: float | np.ndarray,
+    should_make_unit: bool = True,
+) -> np.ndarray:
+    """
+    Rotate vectors about arbitrary axes using Rodrigues' rotation formula.
+
+    Parameters
+    ----------
+    rot_axis : np.ndarray
+        Rotation axes with shape (..., 3).
+
+    vec_to_rot : np.ndarray
+        Vectors to rotate with shape (..., 3).
+
+    angle_deg : float or np.ndarray
+        Rotation angle(s) in degrees. Can be scalar or have shape (...).
+
+    should_make_unit : bool
+        If True, normalize both the rotation axes and input vectors,
+        and normalize the output.
+
+    Returns
+    -------
+    np.ndarray
+        Rotated vectors with shape (..., 3).
+    """
+
+    angle_rad = np.deg2rad(angle_deg)
+
+    rot_axis = np.array(rot_axis, dtype=float, copy=True)
+    vec_to_rot = np.array(vec_to_rot, dtype=float, copy=True)
+
+    if should_make_unit:
+        rot_axis /= np.linalg.norm(
+            rot_axis,
+            axis=-1,
+            keepdims=True
+        )
+
+        vec_to_rot /= np.linalg.norm(
+            vec_to_rot,
+            axis=-1,
+            keepdims=True
+        )
+
+    cos_angle = np.cos(angle_rad)[..., None]
+    sin_angle = np.sin(angle_rad)[..., None]
+
+    dot = np.sum(
+        rot_axis * vec_to_rot,
+        axis=-1,
+        keepdims=True
+    )
+
+    rotated_vector = (
+        vec_to_rot * cos_angle
+        + np.cross(rot_axis, vec_to_rot) * sin_angle
+        + rot_axis * dot * (1 - cos_angle)
+    )
+
+    if should_make_unit:
+        rotated_vector /= np.linalg.norm(
+            rotated_vector,
+            axis=-1,
+            keepdims=True
+        )
+
+    return rotated_vector
+
+def _angle_deg_between_two_vectors_(v1:np.ndarray, v2:np.ndarray):
+    """Returns the angle in degrees between vectors
+
+    :param np.ndarray v1: [..., xyz]
+    :param np.ndarray v2: [..., xyz]
+    :return _type_: angles between the vectors
+    """
+    dot = np.sum(v1 * v2, axis=-1) / (
+        np.linalg.norm(v1, axis=-1) *
+        np.linalg.norm(v2, axis=-1))
+    return np.asarray(np.rad2deg(np.arccos(np.clip(dot, -1, 1))))
+
+def _template_RayData_(is_polarized:bool=True, include_Zemax_extra_fields:bool=False)->pd.DataFrame:
+    """This function returns an empty dataset to write TM25RAY files that Zemax will like to read for a (NCE) raytrace. 
+
+    :param is_polarized: If True polarization of the ray will be defined, defaults to True
+    :type is_polarized: bool, optional
+    :param include_Zemax_extra_fields: If True the user is expected to define the phase and electric field components of each ray. Zemax should read this over Stokes definitions - but it is ideal to have the correct Stokes information in as well, defaults to False
+    :type include_Zemax_extra_fields: bool, optional
+    :return: A template to write rays to which can be saved as a TM25RAY file with :func:`TM25RAY_write_file`
+    :rtype: pd.DataFrame
+    """
+    columns = [
+    "XPosition",
+    "YPosition",
+    "ZPosition",
+    "XDirectionCosine",
+    "YDirectionCosine",
+    "ZDirectionCosine",
+    "RadiantFluxStokesS0",
+    "Wavelength",
+    ]
+    if is_polarized:
+        columns = columns + [
+    "StokesS1",
+    "StokesS2",
+    "StokesS3",
+    "PolarizationEllipseMajorAxis_XDirectionCosine",
+    "PolarizationEllipseMajorAxis_YDirectionCosine",
+    "PolarizationEllipseMajorAxis_ZDirectionCosine",
+    ]
+    if include_Zemax_extra_fields:
+        columns = columns + [
+    "phase",
+    "phase_dbl_err",
+    "exr",
+    "exi",
+    "eyr",
+    "eyi",
+    "ezr",
+    "ezi",
+    ]
+
+    df = pd.DataFrame(columns=columns)
+    df.index.name = "RayNumber"
+    return df

@@ -40,6 +40,14 @@ class skZemaxClass(PythonStandaloneApplication):
 
         self.BatchRayTrace = BatchRayTrace
 
+    from skZemax.ZemaxRaytraceSupplement.TM25RAY.tm25ray import (
+        TM25RAY_ReadFile,
+        TM25RAY_WriteFile,
+        TM25RAY_MakePolarizedSourceFile,
+    )
+    TM25RAY_ReadFile = staticmethod(TM25RAY_ReadFile)
+    TM25RAY_WriteFile = staticmethod(TM25RAY_WriteFile)
+
     # Adding skZemax_subfunctions to skZemaxClass
     from skZemax.skZemax_subfunctions._analyses_functions import (
         Analyses_ExtractSectionOfTextFile,
@@ -174,6 +182,10 @@ class skZemaxClass(PythonStandaloneApplication):
         _convert_raw_obj_input_,
         _NCE_GetObjectCellCalls_,
         _NCE_GetObjectColumns_,
+    )
+    from skZemax.skZemax_subfunctions._NCE_object_specific_functions import (
+        NCE_SetMuellerMatrix,
+        NCE_SetMuellerMatrixLinearDiattenuator,
     )
     from skZemax.skZemax_subfunctions._rayaiming_functions import (
         RayAiming_GetNamesOfAllAimingMethods,
