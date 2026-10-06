@@ -159,6 +159,7 @@ class skZemaxClass(PythonStandaloneApplication):
     from skZemax.skZemax_subfunctions._NCE_functions import (
         NCE_AddNewObject,
         NCE_ChangeObjectType,
+        NCE_GetObjectType,
         NCE_ColocateObject,
         NCE_GetAllColumnDataOfObject,
         NCE_GetNumberOfObjects,

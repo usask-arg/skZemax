@@ -175,7 +175,7 @@ def NCE_RunRayTrace(
 
 def NCE_ChangeObjectType(
     self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow, object_type: str
-) -> None:
+) -> ZOSAPI_Editors_NCE_INCERow:
     """
     Changes the type of the NCE Object
 
@@ -183,6 +183,8 @@ def NCE_ChangeObjectType(
     :type ObjectNCE: Union[int, ZOSAPI_Editors_NCE_INCERow]
     :param object_type: The changed NCE object
     :type object_type: str
+    :return: The same NCE object but now changed.
+    :rtype: ZOSAPI_Editors_NCE_INCERow
     """
     ObjectNCE = self._convert_raw_obj_input_(ObjectNCE, return_index=False)
     objecttype = _CheckIfStringValidInDir_(
@@ -192,6 +194,21 @@ def NCE_ChangeObjectType(
         ObjectNCE.ChangeType(ObjectNCE.GetObjectTypeSettings(objecttype))
     elif self._verbose:
         cp("!@ly!@NCE_ChangeObjectType :: Did not change object")
+    return ObjectNCE
+
+def NCE_GetObjectType(
+    self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow
+) -> str:
+    """
+    Returns the type of the NCE Object the object is
+
+    :param ObjectNCE: The NCE object to get the type of. Can be given as an index or an NCE object.
+    :type ObjectNCE: Union[int, ZOSAPI_Editors_NCE_INCERow]
+    :return: The object type.
+    :rtype: str
+    """
+    ObjectNCE = self._convert_raw_obj_input_(ObjectNCE, return_index=False)
+    return str(ObjectNCE.Type)
 
 
 def NCE_ColocateObject(
