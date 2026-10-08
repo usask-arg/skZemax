@@ -108,44 +108,59 @@ def TM25RAY_WriteFile(path_to_file:str|Path, RayData:pd.DataFrame, SpectralTable
     _write_ray_data_(in_buffer_generator=buffer_generator, RayData=RayData)
     buffer_generator.close()
 
-def TM25RAY_MakePolarizedSourceFile(self, ObjectNCE: int | ZOSAPI_Editors_NCE_INCERow, 
+def TM25RAY_MakePolarizedSourceFile(self, 
+                                    file_name: str,
+                                    wavelengths:list|np.ndarray|float=750.0,
                                     XPosition:np.ndarray=np.array([0]), 
                                     YPosition:np.ndarray=np.array([0]), 
                                     ZPosition:np.ndarray=np.array([0]), 
                                     TiltAboutX:np.ndarray=np.array([0]), 
                                     TiltAboutY:np.ndarray=np.array([0]), 
                                     TiltAboutZ:np.ndarray=np.array([0]), 
-                                    random_polarization:bool=True)->pd.DataFrame:
+                                    random_polarization:bool=True,
+                                    UseGlobalXYZRotationOrder: bool=False)->pd.DataFrame:
+    wavelengths = np.atleast_1d(wavelengths)
+    # # https://optics.ansys.com/hc/en-us/articles/42661777200403-Rotation-Matrix-and-Tilt-About-X-Y-Z-in-OpticStudio
+    # if UseGlobalXYZRotationOrder:
+    #     # This option allows the system to (instrinsic rotation of):
+    #     # - first tilt about the Z axis, 
+    #     # - then tilt about Y axis, 
+    #     # - lastly by X axis. 
+    #     # The tilt about Z value changes the Y axis direction, which allows the rotation about new Y’ axis to tilt the Z’ axis to the desired Z” direction.
+    #     pass
+    # else:
+    #     #   extrinsic (rotate along the original axes) z-y-x rotation, where we 
+    #     # - first extrinsically tilt about Z, 
+    #     # - then tilt about Y, 
+    #     # - lastly tilt about X. 
+    #     # This is equivalent to an instrinsic x-y-z rotation, where the system is rotated intrinsically first about X, then about Y, lastly about Z.
+    #     pass
+    RayData                                                     = _template_RayData_(is_polarized=True, include_Zemax_extra_fields=False)
+    RayData["XPosition"]                                        = [0.0, 0.0, 0.0, 0.0]
+    RayData["YPosition"]                                        = [0.0, 0.0, 0.0, 0.0]
+    RayData["ZPosition"]                                        = [0.0, 0.0, 0.0, 0.0]
+    RayData["XDirectionCosine"]                                 = [0.0, 0.0, 0.0, 0.0]
+    RayData["YDirectionCosine"]                                 = [0.0, 0.0, 0.0, 0.0]
+    RayData["ZDirectionCosine"]                                 = [1.0, 1.0, 1.0, 1.0]
+    RayData["RadiantFluxStokesS0"]                              = [1.0, 1.0, 1.0, 1.0]
+    RayData["Wavelength"]                                       = np.broadcast_to(wavelengths,  RayData["RadiantFluxStokesS0"].shape)
+    RayData["StokesS1"]                                         = [0.0, 1.0, 0.0, 0.0]
+    RayData["StokesS2"]                                         = [0.0, 0.0, 1.0, 0.0]
+    RayData["StokesS3"]                                         = [0.0, 0.0, 0.0, 1.0]
+    RayData["PolarizationEllipseMajorAxis_XDirectionCosine"]    = [0.0, 0.0, 0.0, 0.0]
+    RayData["PolarizationEllipseMajorAxis_YDirectionCosine"]    = [1.0, 1.0, 1.0, 1.0]
+    RayData["PolarizationEllipseMajorAxis_ZDirectionCosine"]    = [0.0, 0.0, 0.0, 0.0]
+    TM25RAY_WriteFile((self.Utilities_ZemaxInstallationSourceDir() / file_name).with_suffix(".TM25RAY"), RayData=RayData)
 
-    # https://optics.ansys.com/hc/en-us/articles/42661777200403-Rotation-Matrix-and-Tilt-About-X-Y-Z-in-OpticStudio
+    # # Current understanding:
+    # If the TM25RAY file contains Stokes and/or the extra Zemax E components then Jx, Jy, X-Phase and Y-Phase settings should be ignored.
+    # If the TM25RAY file has phase information then initial phase should be ignored. 
+    # Coherence length is always used
 
-    import os
-    rays = self.TM25RAY_ReadFile(self.Utilities_ZemaxInstallationSourceDir() + os.sep + "DoLPHIN_Source.TM25RAY").RayData
-    rays['Xang'] = np.rad2deg(np.arccos(rays['XDirectionCosine']))
-    rays['Yang'] = np.rad2deg(np.arccos(rays['YDirectionCosine']))
-    rays['Zang'] = np.rad2deg(np.arccos(rays['ZDirectionCosine']))
-    rays[['Xang', 'Yang', 'Zang']]
-    if ObjectNCE.TypeData.UseGlobalXYZRotationOrder:
-        # This option allows the system to (instrinsic rotation of):
-        # - first tilt about the Z axis, 
-        # - then tilt about Y axis, 
-        # - lastly by X axis. 
-        # The tilt about Z value changes the Y axis direction, which allows the rotation about new Y’ axis to tilt the Z’ axis to the desired Z” direction.
-        pass
-    else:
-        #   extrinsic (rotate along the original axes) z-y-x rotation, where we 
-        # - first extrinsically tilt about Z, 
-        # - then tilt about Y, 
-        # - lastly tilt about X. 
-        # This is equivalent to an instrinsic x-y-z rotation, where the system is rotated intrinsically first about X, then about Y, lastly about Z.
-        pass
-
-    # Get the source position and rotation matrices to build the ray file from
-    off, R = self.NCE_GetObjectRotationAndPositionMatrices(ObjectNCE)
-    RayData = _template_RayData_(is_polarized=True, include_Zemax_extra_fields=False)
-    basis_angles_deg_xyz = _angle_deg_between_two_vectors_(np.array([0,0,1]), R)
-
-
-    xyz_directional_cosines = R[:, -1] # == np.cos(np.deg2rad(basis_angles_deg_xyz)) 
+    # # Get the source position and rotation matrices to build the ray file from
+    # off, R = self.NCE_GetObjectRotationAndPositionMatrices(ObjectNCE)
+    # 
+    # basis_angles_deg_wr_to_Z = _angle_deg_between_two_vectors_(np.array([0,0,1]), R)
+    # xyz_directional_cosines = R[:, -1] # == np.cos(np.deg2rad(basis_angles_deg_wr_to_Z)) 
 
 

@@ -9,151 +9,151 @@ from box import Box
 from skZemax.skZemax_subfunctions._c_print import c_print as cp
 
 
-def Utilities_ZemaxInstallationExampleDir(self) -> str:
+def Utilities_ZemaxInstallationExampleDir(self) -> Path:
     """
     Returns directory of the default Zemax example files given with the installation.
 
     :return: Path to dir.
-    :rtype: str
+    :rtype: Path
     """
-    return self.TheApplication.SamplesDir
+    return Path(self.TheApplication.SamplesDir)
 
 
-def Utilities_ZemaxInstallationCoatingDir(self) -> str:
+def Utilities_ZemaxInstallationCoatingDir(self) -> Path:
     """
     Returns directory of the default Zemax coating (.zec) files given with the installation.
 
     :return: Path to dir.
-    :rtype: str
+    :rtype: Path
     """
-    return self.TheApplication.CoatingDir
+    return Path(self.TheApplication.CoatingDir)
 
 
-def Utilities_ZemaxInstallationMaterialDir(self) -> str:
+def Utilities_ZemaxInstallationMaterialDir(self) -> Path:
     """
     Returns directory of the default Zemax material (.agf , .bgf) files given with the installation.
 
     :return: Path to dir.
-    :rtype: str
+    :rtype: Path
     """
-    return self.TheApplication.GlassDir
+    return Path(self.TheApplication.GlassDir)
 
 
-def Utilities_ZemaxInstallationScatterDir(self) -> str:
+def Utilities_ZemaxInstallationScatterDir(self) -> Path:
     """
     Returns directory of the default Zemax scatter (.bsdf) files given with the installation.
 
     :return: Path to dir.
-    :rtype: str
+    :rtype: Path
     """
-    return self.TheApplication.ScatterDir
+    return Path(self.TheApplication.ScatterDir)
 
 
-def Utilities_ZemaxInstallationPolygonObjectDir(self) -> str:
+def Utilities_ZemaxInstallationPolygonObjectDir(self) -> Path:
     """
     Returns directory of the default Zemax polygon object (.pob) files given with the installation.
 
     :return: Path to dir.
-    :rtype: str
+    :rtype: Path
     """
-    return self.TheApplication.ObjectsDir + os.sep + "Polygon Objects"
+    return Path(self.TheApplication.ObjectsDir + os.sep + "Polygon Objects")
 
 
-def Utilities_ZemaxInstallationCADObjectDir(self) -> str:
-    """
-    Returns directory of the default Zemax CAD object (.stp , .stl , .igs) files given with the installation.
-
-    :return: Path to dir.
-    :rtype: str
-    """
-    return self.TheApplication.ObjectsDir + os.sep + "CAD Files"
-
-
-def Utilities_ZemaxInstallationSourceDir(self) -> str:
+def Utilities_ZemaxInstallationCADObjectDir(self) -> Path:
     """
     Returns directory of the default Zemax CAD object (.stp , .stl , .igs) files given with the installation.
 
     :return: Path to dir.
     :rtype: str
     """
-    return self.TheApplication.ObjectsDir + os.sep + "Sources" + os.sep + "Source Files"
+    return Path(self.TheApplication.ObjectsDir + os.sep + "CAD Files")
 
-def Utilities_ZemaxInstallationImageDir(self) -> str:
+
+def Utilities_ZemaxInstallationSourceDir(self) -> Path:
+    """
+    Returns directory of the default Zemax CAD object (.stp , .stl , .igs) files given with the installation.
+
+    :return: Path to dir.
+    :rtype: Path
+    """
+    return Path(self.TheApplication.ObjectsDir + os.sep + "Sources" + os.sep + "Source Files")
+
+def Utilities_ZemaxInstallationImageDir(self) -> Path:
     """
     Returns directory of the default Zemax images (.png , .bmp , .ima) files given with the installation.
 
     :return: Path to dir.
-    :rtype: str
+    :rtype: Path
     """
-    return self.TheApplication.ImagesDir
+    return Path(self.TheApplication.ImagesDir)
 
 
-def Utilities_skZemaxExampleDir(self) -> str:
+def Utilities_skZemaxExampleDir(self) -> Path:
     """
     Returns directory of skZemax example files adapted to use skZemax.
 
     :return: Path to dir.
-    :rtype: str
+    :rtype: Path
     """
     pythondir = Path(__file__).parent.parent.parent.parent / 'docs' / 'source' / 'Examples'
     pythondir.mkdir(parents=True, exist_ok=True)
     return pythondir
 
 
-def Utilities_ConfigFilesDir(self) -> str:
+def Utilities_ConfigFilesDir(self) -> Path:
     """
     Returns a skZemax default directory of Zemax configuration files.
     For instance, the ZOS-API for analyses functions does not generally work natively. To bypass this, skZemax writes - and then loads - intermediate configuration files for it.
     These files are stored in this directory.
 
     :return: Path to dir.
-    :rtype: str
+    :rtype: Path
     """
     cnfdir = Path(__file__).parent.parent / 'ZemaxConfigFiles' 
     cnfdir.mkdir(parents=True, exist_ok=True)
     return cnfdir
 
 
-def Utilities_DetectorFilesDir(self) -> str:
+def Utilities_DetectorFilesDir(self) -> Path:
     """
     Returns a skZemax default directory of Zemax detector files (.DDR or .DDP files).
 
     :return: Absolute path to the detector files directory.
-    :rtype: str
+    :rtype: Path
     """
     cnfdir = Path(__file__).parent.parent / 'ZemaxDetectorFiles' 
     cnfdir.mkdir(parents=True, exist_ok=True)
     return cnfdir
 
 
-def Utilities_AnalysesFilesDir(self) -> str:
+def Utilities_AnalysesFilesDir(self) -> Path:
     """
     Returns a skZemax default directory of Zemax (intermediate) analyses files.
 
     :return: Absolute path to the analysis files directory.
-    :rtype: str
+    :rtype: Path
     """
     cnfdir = Path(__file__).parent.parent / 'ZemaxAnalysesFiles' 
     cnfdir.mkdir(parents=True, exist_ok=True)
     return cnfdir
 
 
-def Utilities_MainProgramDir(self) -> str:
+def Utilities_MainProgramDir(self) -> Path:
     """
     Returns an absolute path to the directory of the first python file being run in *any* python program (sys.argv[0]).
 
     :return: Absolute path to the main python file being run.
-    :rtype: str
+    :rtype: Path
     """
-    return os.path.abspath(os.path.dirname(sys.argv[0]))
+    return Path(sys.argv[0]).parent
 
 
-def Utilities_OpenZemaxFile(self, in_file_path: str, save_first: bool = False):
+def Utilities_OpenZemaxFile(self, in_file_path: str|Path, save_first: bool = False):
     """
     Opens a Zemax file.
 
     :param in_file_path: Path to file.
-    :type in_file_path: str
+    :type in_file_path: str|Path
     :param save_first: Indicates if one should save the current Zemax file (if any) before making the new file, defaults to False
     :type save_first: bool, optional
     """
@@ -163,17 +163,17 @@ def Utilities_OpenZemaxFile(self, in_file_path: str, save_first: bool = False):
                 "Saved current Zemax file." if save_first else "", in_file_path
             )
         )
-    self.TheSystem.LoadFile(in_file_path, save_first)
+    self.TheSystem.LoadFile(str(in_file_path), save_first)
 
 
 def Utilities_MakeNewZemaxFile(
-    self, in_file_path: str, save_first: bool = False
+    self, in_file_path: str|Path, save_first: bool = False
 ) -> None:
     """
     Makes a new Zemax file.
 
     :param in_file_path: Path to file.
-    :type in_file_path: str
+    :type in_file_path: str|Path
     :param save_first: Indicates if one should save the current Zemax file (if any) before making the new file, defaults to False
     :type save_first: bool, optional
     """
@@ -196,12 +196,12 @@ def Utilities_SaveZemaxFile(self) -> None:
     self.TheSystem.Save()
 
 
-def Utilities_SaveZemaxFileAs(self, in_file_path: str) -> None:
+def Utilities_SaveZemaxFileAs(self, in_file_path: str|Path) -> None:
     """
     Saves the current Zemax file a a new file.
 
     :param in_file_path: Path to file.
-    :type in_file_path: str
+    :type in_file_path: str|Path
     """
     if self._verbose:
         cp(
