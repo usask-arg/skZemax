@@ -1,5 +1,6 @@
 from box import Box
 import struct
+import warnings
 import numpy as np
 import pandas as pd
 from typing import Generator
@@ -247,6 +248,11 @@ def _define_ray_block_contents_from_ray_info_(RayData:pd.DataFrame, SpectralTabl
 def _write_header_and_flags_(in_buffer_generator:Generator[bytes, int, None], RayData:pd.DataFrame, SpectralTables:pd.DataFrame, AdditionalTextBlock:str)->Box:
     """This function works out the headers and flags which should be in the file given the ray data, spectral tables, and additional text block.
 
+    Before anything is written the ray data is validated (:func:`_ray_data_error_checking_`). For polarized files
+    (Stokes flag set) a warning is issued if the per-ray flux is not uniform, because OpticStudio equalizes the power of
+    polarized source rays after their first interaction (see ``TM25RAY_polarization_notes.md`` in this folder); the file
+    is still written as given.
+
     :param in_buffer_generator:  A generator to produce binary data. It should be set to read from the start of the file.
     :type in_buffer_generator: Generator[bytes, int, None]
     :param RayData: The ray data. See description in :func:`_define_ray_block_contents_from_ray_info_`
@@ -264,7 +270,15 @@ def _write_header_and_flags_(in_buffer_generator:Generator[bytes, int, None], Ra
     n_additional = header_and_flags.NumberOfAdditionalRayDataItemsPerRay
     additional_labels = Box({'AdditionalRayDataColumnLabels': list(RayData.columns[-n_additional:]) if n_additional > 0 else []})
     canonical_labels = _define_ray_block_contents_from_header_and_flags_(header_and_flags=header_and_flags, additional_ray_labels=additional_labels)
-    _ray_data_error_checking_(RayData.set_axis(canonical_labels, axis=1), header_and_flags)
+    canonical_RayData = _ray_data_error_checking_(RayData.set_axis(canonical_labels, axis=1), header_and_flags)
+    # OpticStudio gives polarized source rays the file-average power after their first interaction, so only uniform
+    # per-ray flux is currently supported for polarized files. Warn only: the file is still written as given.
+    # See TM25RAY_polarization_notes.md (section 5) next to this file for details and the planned solution.
+    if header_and_flags.StokesFlag == 1:
+        S0 = canonical_RayData['RadiantFluxStokesS0'].to_numpy(dtype=float)
+        if not np.allclose(S0, S0.mean(), rtol=1e-6, atol=0):
+            warnings.warn('Only uniform polarized sources are currently supported - Zemax will equalize your ray intensities '
+                          '(see TM25RAY_polarization_notes.md).')
     # Header float fields are packed as raw bytes ('4s') via _float32_to_TM25RAY_bytes_ so that missing values (NaN)
     # are written as signaling NaNs, as TM-25 §4.5.3 requires (struct's 'f' would write a quiet NaN, which is invalid).
     data_to_write = (
@@ -583,7 +597,7 @@ def _stokes_to_TM25RAY_polarization_(stokes:np.ndarray, ray_direction:np.ndarray
         ``PolarizationEllipseMajorAxis_XDirectionCosine``, ``PolarizationEllipseMajorAxis_YDirectionCosine`` and
         ``PolarizationEllipseMajorAxis_ZDirectionCosine``, named as in :func:`_template_RayData_` so they can be
         assigned directly into a RayData frame. ``RadiantFluxStokesS0`` is not returned and should be set by the caller
-        (S0 = 1 per ray is recommended for Zemax).
+        (any positive S0 works; it sets the ray's relative power).
     :rtype: pd.DataFrame
     """
     stokes = np.atleast_2d(np.asarray(stokes, dtype=float))

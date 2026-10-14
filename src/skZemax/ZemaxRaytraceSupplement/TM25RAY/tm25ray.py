@@ -151,17 +151,23 @@ def TM25RAY_MakePolarizedSourceFile(self,
     * Otherwise the ellipse shape and handedness come from the full Stokes vector (a standard
       Stokes-to-Jones conversion that uses S1, S2 and S3). The ellipse is then rotated about k so that its
       **major axis lies along M**. The orientation of linear polarization therefore comes **only from M**.
-    * Zemax combines the stored S1-S3 directly with S0. This only agrees with TM-25's
-      S0-normalization when S0 = 1, so keep S0 = 1 per ray and set the total power with the
-      ``SourceFile`` object's power parameter.
+    * The manual's equations are written as if S0 = 1, but tests show Zemax reads S1-S3 as normalized by S0
+      (as TM-25 requires); the S0 value does not affect the polarization state. S0 only sets each ray's
+      relative power: Zemax rescales the total to the ``SourceFile`` object's power parameter.
     * Files written by Zemax place the major axis on x and carry extra Ex/Ey/Ez columns.
       Zemax uses those columns, not the Stokes values, when it re-reads its own files.
+
+    .. warning::
+        Known OpticStudio limitation (tested 2026 R1): after their first interaction with any object, all *polarized*
+        source rays carry the file-average power, so per-ray weighting is lost. Only uniform polarized sources (equal S0
+        per ray) are currently supported; the writer warns otherwise. See ``TM25RAY_polarization_notes.md`` in this
+        folder for the test results, workarounds and the planned workflow for weighted, complex polarized scenes.
 
     **Encoding used here (valid under both TM-25 readings and Zemax):** for Stokes (S0, S1, S2, S3)
     given in a user basis (x_ref, y_ref = k × x_ref), take psi = 0.5*atan2(S2, S1) and write
 
         - M = cos(psi)*x_ref + sin(psi)*y_ref
-        - (S1, S2, S3) = (sqrt(S1² + S2²), 0, S3) / S0, with S0 = 1
+        - (S1, S2, S3) = (sqrt(S1² + S2²), 0, S3) / S0, for any S0 > 0
 
     For example, +45° linear light along +Z with x_ref = +X is written as M = (1/√2, 1/√2, 0) and Stokes (1, 0, 0).
     The physical sign of S3 (circular handedness) is not defined by TM-25. It still needs to be checked

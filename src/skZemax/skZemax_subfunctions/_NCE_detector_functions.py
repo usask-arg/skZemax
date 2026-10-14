@@ -166,7 +166,9 @@ def _NCE_GetRectDet_Complete_(self, in_RetDet: int) -> xr.Dataset:
     det_unit_data["Phase Units"] = "Degrees"
     det_unit_data["Distance Units"] = unit_dict["LensUnits"]
     # Build images as Zemax does (according to their documentation). I have compared this with the actual Zemax UI and it seems to be correct.
-    phase = np.flipud(
+    # The real and imaginary images are already flipped by _NCE_GetDetector_InfoAndImage_Coherent_, so no further flip is applied here
+    # (an extra np.flipud would leave the phase image upside-down relative to all other images in the dataset).
+    phase = (
         np.arctan2(Coherent_Img_detector_image, Coherent_Real_detector_image)
         * 180
         / np.pi
@@ -303,7 +305,7 @@ def _NCE_GetRectDet_Complete_(self, in_RetDet: int) -> xr.Dataset:
                     int(det_info["Num Y Pixels"]),
                 ),
             ),
-            "y_angle": ("y_angle", y_angles.astype(int)),
+            "y_angle": ("y_angle", y_angles.astype(float)),
             "x_pixel": (
                 "x_pixel",
                 np.arange(0, Incoherent_detector_incho_power.shape[1], 1).astype(int),
@@ -316,7 +318,7 @@ def _NCE_GetRectDet_Complete_(self, in_RetDet: int) -> xr.Dataset:
                     int(det_info["Num X Pixels"]),
                 ),
             ),
-            "x_angle": ("x_angle", x_angles.astype(int)),
+            "x_angle": ("x_angle", x_angles.astype(float)),
         },
     )
     out.attrs = det_unit_data | stat_dict | det_info
@@ -495,12 +497,14 @@ def NCE_GetDetectorLocations(self) -> list:
     This function looks through each NCE object in the system and checks if it is a detector.
     If it is, it returns the object's index in a list.
 
+    NCE objects are numbered from 1 to :func:`NCE_GetNumberOfObjects` (inclusive), so all of those indices are checked.
+
     :return: A list of NCE object indicies indicating the indices of detectors.
     :rtype: list
     """
     return [
         x
-        for x in range(self.NCE_GetNumberOfObjects())
+        for x in range(1, self.NCE_GetNumberOfObjects() + 1)
         if self.TheSystem.NCE.GetDetectorDimensions(x, 0, 0)[0]
     ]
 
