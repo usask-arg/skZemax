@@ -3,7 +3,8 @@ import struct
 import numpy as np
 import pandas as pd
 from typing import Generator
-from skZemax.ZemaxRaytraceSupplement.TM25RAY.reading_and_writeing_workers import _header_and_flags_error_checking_
+from skZemax.ZemaxRaytraceSupplement.TM25RAY.reading_and_writeing_workers import _header_and_flags_error_checking_, _float32_to_TM25RAY_bytes_, _ray_data_error_checking_
+from skZemax.ZemaxRaytraceSupplement.TM25RAY.reading_workers import _define_ray_block_contents_from_header_and_flags_
 
 def _write_binary_block_(filename: str) -> Generator[None, bytes | int, None]:
     """Construct a generator for writing binary data.
@@ -46,7 +47,7 @@ def _write_binary_block_(filename: str) -> Generator[None, bytes | int, None]:
 
             request = yield
 
-def _encode_str_(in_str: str, size_bytes: int, format: str = "utf-32",
+def _encode_str_(in_str: str, size_bytes: int, format: str = "utf-32-le",
 ) -> bytes:
     """Worker function to encode a TM25RAY string field as bytes.
 
@@ -54,11 +55,15 @@ def _encode_str_(in_str: str, size_bytes: int, format: str = "utf-32",
     ``size_bytes`` bytes. If the encoded string exceeds the requested size,
     a ValueError is raised.
 
+    TM-25 strings are UTF-32 (§4.5.4) in a little-endian file (§4.1), so the default is ``'utf-32-le'``, which
+    writes no byte order mark. (Python's ``'utf-32'`` would prepend a 4-byte mark, which other readers may show
+    as a leading character and which uses up one of the 1,000 characters a 4,000-byte field can hold.)
+
     :param in_str: string to encode as binary data
     :type in_str: str
     :param size_bytes: number of bytes to allocate for the string field
     :type size_bytes: int
-    :param format: encoding scheme, defaults to 'utf-32'
+    :param format: encoding scheme, defaults to 'utf-32-le'
     :type format: str, optional
     :raises ValueError: If the encoded string is larger than ``size_bytes`` bytes.
     :return: the encoded and padded binary data
@@ -134,7 +139,7 @@ def _define_ray_block_contents_from_ray_info_(RayData:pd.DataFrame, SpectralTabl
     out.FileType                                = 'TM25'
     out.FileVersion                             = 2013
     out.CreationMethod                          = 0 # Simulation
-    out.FileCreationDateAndTime                 = pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%M:%S%z")
+    out.FileCreationDateAndTime                 = pd.Timestamp.now(tz="UTC").isoformat(timespec='seconds') # ISO 8601 YYYY-MM-DDThh:mm:ss+hh:mm (TM-25 §4.7.1.7)
     out.RayStartPosition                        = 1 # Specified rays
     out.PositionFlag                            = 1
     out.DirectionFlag                           = 1
@@ -167,8 +172,12 @@ def _define_ray_block_contents_from_ray_info_(RayData:pd.DataFrame, SpectralTabl
             in_box.SpectralDataIdentifier = 1
         elif not np.isnan(in_box.MinimumWavelength):
             in_box.SpectralDataIdentifier = 2
+        elif not SpectralTables.empty:
+            # Several tables but no per-ray SpectrumIndex column to say which ray uses which table.
+            raise Exception("Can not identify the correct SpectralDataIdentifier (several spectral tables given but no SpectrumIndex column).")
         else:
-            raise Exception("Can not identify the correct SpectralDataIdentifier.")
+            # No wavelength column and no spectral tables: a watts/lumen based file without wavelength information (TM-25 §4.7.1.9 option 0).
+            in_box.SpectralDataIdentifier = 0
         if in_box.SpectralDataIdentifier == 3 or in_box.SpectralDataIdentifier == 4:
             in_box.MinimumWavelength = SpectralTables.Wavelengths.min()
             in_box.MaximumWavelength = SpectralTables.Wavelengths.max()
@@ -208,7 +217,7 @@ def _define_ray_block_contents_from_ray_info_(RayData:pd.DataFrame, SpectralTabl
         if current_column == len(columns):
             return _return_formatted_header_and_flags_(out)
     #----------------------------------------------------------------------------------------------------------#
-    if current_column+6 < len(columns):
+    if current_column+6 <= len(columns):
         stokes_vector_present = (all('stokes' in x for x in columns[current_column:current_column+3]) and 's1' in columns[current_column] and 's2' in columns[current_column+1] and 's3' in columns[current_column+2])
         stokes_axis_present   = (all(('ellipse' in x and 'polarization' in x and 'major' in x and 'direction' in x and 'cosine' in x) for x in columns[current_column+3:current_column+6]) and 'x' in columns[current_column+3] and 'y' in columns[current_column+4] and 'z' in columns[current_column+5])
         out.StokesFlag = 1 if stokes_vector_present and stokes_axis_present else 0
@@ -217,8 +226,8 @@ def _define_ray_block_contents_from_ray_info_(RayData:pd.DataFrame, SpectralTabl
             if current_column == len(columns):
                 return _return_formatted_header_and_flags_(out)
     #----------------------------------------------------------------------------------------------------------#
-    if current_column+2 < len(columns):
-        out.TristimulusFlag = 1 if all('tristimulus' in x for x in columns[current_column:current_column+2]) and 'x' in columns[current_column] and 'y' in columns[current_column+1] else 0
+    if current_column+2 <= len(columns):
+        out.TristimulusFlag = 1 if all('tristimulus' in x for x in columns[current_column:current_column+2]) and 'x' in columns[current_column] and 'z' in columns[current_column+1] else 0
         if out.TristimulusFlag == 1:
             current_column += 2
             if current_column == len(columns):
@@ -250,19 +259,27 @@ def _write_header_and_flags_(in_buffer_generator:Generator[bytes, int, None], Ra
     :rtype: Box
     """
     header_and_flags = _define_ray_block_contents_from_ray_info_(RayData=RayData, SpectralTables=SpectralTables, AdditionalTextBlock=AdditionalTextBlock)
+    # Validate the ray data before anything is written. The writer detects columns by name fragments, so the columns are
+    # first renamed to the canonical labels a reader would assign from these flags (any additional columns keep their names).
+    n_additional = header_and_flags.NumberOfAdditionalRayDataItemsPerRay
+    additional_labels = Box({'AdditionalRayDataColumnLabels': list(RayData.columns[-n_additional:]) if n_additional > 0 else []})
+    canonical_labels = _define_ray_block_contents_from_header_and_flags_(header_and_flags=header_and_flags, additional_ray_labels=additional_labels)
+    _ray_data_error_checking_(RayData.set_axis(canonical_labels, axis=1), header_and_flags)
+    # Header float fields are packed as raw bytes ('4s') via _float32_to_TM25RAY_bytes_ so that missing values (NaN)
+    # are written as signaling NaNs, as TM-25 §4.5.3 requires (struct's 'f' would write a quiet NaN, which is invalid).
     data_to_write = (
         _encode_str_(in_str=header_and_flags.FileType, size_bytes=4, format='ascii'),
         header_and_flags.FileVersion,
         header_and_flags.CreationMethod,
-        header_and_flags.TotalLuminousFlux,
-        header_and_flags.TotalRadiantFlux,
+        _float32_to_TM25RAY_bytes_(header_and_flags.TotalLuminousFlux),
+        _float32_to_TM25RAY_bytes_(header_and_flags.TotalRadiantFlux),
         header_and_flags.NumberOfRays,
         _encode_str_(in_str=header_and_flags.FileCreationDateAndTime, size_bytes=28, format='ascii'),
         header_and_flags.RayStartPosition,
         header_and_flags.SpectralDataIdentifier,
-        header_and_flags.SingleWavelength,
-        header_and_flags.MinimumWavelength,
-        header_and_flags.MaximumWavelength,
+        _float32_to_TM25RAY_bytes_(header_and_flags.SingleWavelength),
+        _float32_to_TM25RAY_bytes_(header_and_flags.MinimumWavelength),
+        _float32_to_TM25RAY_bytes_(header_and_flags.MaximumWavelength),
         header_and_flags.NumberOfSpectralTables,
         header_and_flags.NumberOfAdditionalRayDataItemsPerRay,
         header_and_flags.SizeOfAdditionalTextBlock,
@@ -276,7 +293,7 @@ def _write_header_and_flags_(in_buffer_generator:Generator[bytes, int, None], Ra
         header_and_flags.SpectrumIndexFlag
     )
     buffer = struct.pack(
-            "<4s i i f f Q 28s i i f f f i i i 168x i i i i i i i i",
+            "<4s i i 4s 4s Q 28s i i 4s 4s 4s i i i 168x i i i i i i i i",
             *data_to_write
         )
     in_buffer_generator.send(buffer)
@@ -351,11 +368,11 @@ def _write_spectral_tables_(in_buffer_generator:Generator[bytes, int, None], Spe
             data_to_write.extend(table_data)
             data_format += table_format
 
-        # Add any needed padding so it is a multiple of 32
-        padding = (len(data_to_write)*4)%32
-        if padding > 0:
-            data_to_write.extend([0 for x in range(padding)])
-            data_format+= 'i '*padding
+        # Zero-pad the block to a multiple of 32 bytes with 4-byte integer zeros (TM-25 §4.7.4, Table 4-4).
+        # Every item written above is 4 bytes, so the number of padding integers is (bytes needed)/4.
+        n_padding_ints = ((32 - (len(data_to_write)*4) % 32) % 32) // 4
+        data_to_write.extend([0]*n_padding_ints)
+        data_format += 'i '*n_padding_ints
 
         buffer = struct.pack(
             data_format,
@@ -416,18 +433,21 @@ def _write_ray_data_(in_buffer_generator:Generator[bytes, int, None],  RayData:p
 
     ...where n is the total number of rays (index from zero). The number of columns are variables depending on the content of the TM25RAY file.
 
+    Every column is written as a little-endian 4-byte float, except a ``SpectrumIndex`` column (any column whose name
+    contains both "spectrum" and "index"), which TM-25 §4.8.1.18 defines as a 4-byte integer. A numpy structured array
+    is used so each column keeps its own type; converting the whole frame with ``to_numpy()`` would turn the
+    integer column into floats, which ``struct``'s integer format cannot pack.
+
     :param in_buffer_generator: A generator to produce binary data. It should be set to after the writing of the additional text block in :func:`TM25RAY_write_file`
     :type in_buffer_generator: Generator[bytes, int, None]
     :param RayData: As defined above.
     :type RayData: pd.DataFrame
     """
-    data_to_write = list(RayData[[x for x in RayData.columns]].to_numpy().flatten())
-    data_format = '<' + ' '.join(['f' if ('spectrum' not in x.lower() or 'index' not in x.lower()) else 'i' for x in RayData.columns]*RayData.shape[0])
-    buffer = struct.pack(
-                data_format,
-                *data_to_write
-            )
-    in_buffer_generator.send(buffer)
+    ray_line_dtype = np.dtype([(x, '<i4' if ('spectrum' in x.lower() and 'index' in x.lower()) else '<f4') for x in RayData.columns])
+    ray_lines = np.empty(RayData.shape[0], dtype=ray_line_dtype)
+    for x in RayData.columns:
+        ray_lines[x] = RayData[x].to_numpy()
+    in_buffer_generator.send(ray_lines.tobytes())
 
 def _rot_about_arb_axis_(
     rot_axis: np.ndarray,
@@ -512,6 +532,89 @@ def _angle_deg_between_two_vectors_(v1:np.ndarray, v2:np.ndarray):
         np.linalg.norm(v1, axis=-1) *
         np.linalg.norm(v2, axis=-1))
     return np.asarray(np.rad2deg(np.arccos(np.clip(dot, -1, 1))))
+
+def _stokes_to_TM25RAY_polarization_(stokes:np.ndarray, ray_direction:np.ndarray=np.array([0.0, 0.0, 1.0]), reference_x:np.ndarray=np.array([1.0, 0.0, 0.0]))->pd.DataFrame:
+    """Converts Stokes vectors measured in a user-chosen basis into the TM25RAY polarization columns
+    (normalized Stokes S1, S2, S3 and the polarization ellipse major axis direction cosines).
+
+    TM-25 (§4.8.1.13-15) defines the per-ray polarization vector M as the major axis of the polarization ellipse,
+    and Zemax orients the ellipse it builds from a TM25RAY file using M only (see :func:`TM25RAY_MakePolarizedSourceFile`).
+    Stokes vectors are therefore not written in the user basis directly. Instead the basis is rotated about the
+    ray direction k by the ellipse azimuth so that its x-axis lies along the major axis. In that frame S2 = 0 and
+    S1 >= 0, which is valid under both the strict and the loose reading of TM-25 and gives the intended state in Zemax.
+
+    .. note::
+        k always points along the direction of ray **propagation** (the way the light travels, i.e. the
+        ``XDirectionCosine``, ``YDirectionCosine`` and ``ZDirectionCosine`` columns of the same rays), not towards the
+        source. The basis therefore looks like the usual "x right, y up" frame to an observer looking back along the
+        ray towards the source. Because y_ref = k × x_ref, reversing k with the same x_ref flips y_ref: for k = -Z and
+        x_ref = +X, y_ref = -Y, so +S2 then appears at -45° in lab coordinates. Use x_ref = -X for backward rays
+        to keep the lab sense of +45°.
+
+    The user basis is (x_ref, y_ref, k) with y_ref = k × x_ref (right-handed, matching TM-25 §3.21), so that:
+
+        - +S1 is linear polarization along x_ref,
+        - +S2 is linear polarization at +45° from x_ref towards y_ref,
+        - S3 is circular polarization (unchanged by the rotation about k).
+
+    The conversion is psi = 0.5*atan2(S2, S1), M = cos(psi)*x_ref + sin(psi)*y_ref and
+    (S1, S2, S3)_TM25 = (sqrt(S1² + S2²), 0, S3) / S0.
+
+    Edge cases:
+
+        - ``reference_x`` does not need to be exactly orthogonal to the ray. Its component along k is removed
+          before use, so e.g. a lab +X can be used for slightly tilted rays. It must not be parallel to the ray.
+        - If the linear part is zero (circular or unpolarized light) the azimuth is undefined; psi = 0 is used,
+          so M = x_ref. Zemax ignores the orientation in that case.
+        - M and -M describe the same ellipse (psi is only defined modulo 180°).
+
+    :param stokes: Stokes vectors (S0, S1, S2, S3) in the user basis, shape (N, 4) or (4,). S0 must be > 0 and
+        S1² + S2² + S3² <= S0². Any consistent unit is accepted because the output is normalized by S0.
+    :type stokes: np.ndarray
+    :param ray_direction: Ray direction vectors k, shape (N, 3) or (3,) (broadcast across rays). Normalized internally,
+        defaults to np.array([0.0, 0.0, 1.0]) (+Z)
+    :type ray_direction: np.ndarray, optional
+    :param reference_x: Reference x-axis x_ref of the user basis, shape (N, 3) or (3,) (broadcast across rays).
+        The defaults (k = +Z, x_ref = +X, so y_ref = +Y) give the conventional lab basis, defaults to np.array([1.0, 0.0, 0.0]) (+X)
+    :type reference_x: np.ndarray, optional
+    :raises ValueError: If S0 <= 0, if the Stokes vector is over-polarized (S1² + S2² + S3² > S0²), or if
+        ``reference_x`` is (nearly) parallel to the ray direction.
+    :return: A DataFrame with N rows and the columns ``StokesS1``, ``StokesS2``, ``StokesS3``,
+        ``PolarizationEllipseMajorAxis_XDirectionCosine``, ``PolarizationEllipseMajorAxis_YDirectionCosine`` and
+        ``PolarizationEllipseMajorAxis_ZDirectionCosine``, named as in :func:`_template_RayData_` so they can be
+        assigned directly into a RayData frame. ``RadiantFluxStokesS0`` is not returned and should be set by the caller
+        (S0 = 1 per ray is recommended for Zemax).
+    :rtype: pd.DataFrame
+    """
+    stokes = np.atleast_2d(np.asarray(stokes, dtype=float))
+    S0, S1, S2, S3 = stokes[:, 0], stokes[:, 1], stokes[:, 2], stokes[:, 3]
+    if np.any(S0 <= 0):
+        raise ValueError('All Stokes S0 values must be > 0.')
+    if np.any(S1**2 + S2**2 + S3**2 > S0**2 * (1 + 1e-6)):
+        raise ValueError('Found Stokes vectors with S1² + S2² + S3² > S0² (over-polarized).')
+    # Build the right-handed user basis (x_ref, y_ref, k) for every ray.
+    k = np.broadcast_to(np.asarray(ray_direction, dtype=float), (stokes.shape[0], 3))
+    k = k / np.linalg.norm(k, axis=-1, keepdims=True)
+    x_ref = np.broadcast_to(np.asarray(reference_x, dtype=float), (stokes.shape[0], 3))
+    x_ref = x_ref - np.sum(x_ref * k, axis=-1, keepdims=True) * k  # remove any component along the ray
+    x_norm = np.linalg.norm(x_ref, axis=-1, keepdims=True)
+    if np.any(x_norm < 1e-9):
+        raise ValueError('reference_x is parallel to the ray direction for at least one ray.')
+    x_ref = x_ref / x_norm
+    y_ref = np.cross(k, x_ref)
+    # Rotate the basis about k by the ellipse azimuth so x lies on the major axis.
+    psi = 0.5 * np.arctan2(S2, S1)
+    M = np.cos(psi)[:, None] * x_ref + np.sin(psi)[:, None] * y_ref
+    out = pd.DataFrame({
+        "StokesS1": np.hypot(S1, S2) / S0,
+        "StokesS2": np.zeros_like(S0),
+        "StokesS3": S3 / S0,
+        "PolarizationEllipseMajorAxis_XDirectionCosine": M[:, 0],
+        "PolarizationEllipseMajorAxis_YDirectionCosine": M[:, 1],
+        "PolarizationEllipseMajorAxis_ZDirectionCosine": M[:, 2],
+    })
+    out.index.name = "RayNumber"
+    return out
 
 def _template_RayData_(is_polarized:bool=True, include_Zemax_extra_fields:bool=False)->pd.DataFrame:
     """This function returns an empty dataset to write TM25RAY files that Zemax will like to read for a (NCE) raytrace. 

@@ -3,7 +3,7 @@ import struct
 import numpy as np
 import pandas as pd
 from typing import Generator
-from skZemax.ZemaxRaytraceSupplement.TM25RAY.reading_and_writeing_workers import _header_and_flags_error_checking_
+from skZemax.ZemaxRaytraceSupplement.TM25RAY.reading_and_writeing_workers import _header_and_flags_error_checking_, _ray_data_error_checking_
 
 def _read_binary_block_(filename:str)->Generator[bytes, int, None]:
     """This function constructs a generator for reading in binary data.
@@ -36,16 +36,27 @@ def _read_binary_block_(filename:str)->Generator[bytes, int, None]:
                 f.seek(request, 1)
                 request = yield
 
-def _decode_str_(in_bytes:bytes, format:str='utf-32')->str:
+def _decode_str_(in_bytes:bytes, format:str='utf-32-le')->str:
     """Worker function to decode a TM25RAY field as a string.
+
+    TM-25 strings are UTF-32 (§4.5.4) in a little-endian file (§4.1), so UTF-32 fields are decoded as ``'utf-32-le'``.
+    Some writers (including older versions of skZemax) put a 4-byte byte order mark at the start of each field; if one is
+    found it is removed and its byte order is used, so those files are still read correctly. Trailing null padding is stripped.
 
     :param in_bytes: array of bytes expected to form a string
     :type in_bytes: bytes
-    :param format: decoding scheme, defaults to 'utf-32'
+    :param format: decoding scheme, defaults to 'utf-32-le'. Any UTF-32 variant ('utf-32', 'utf-32-le', 'utf-32-be') gets the byte order mark handling above; other formats (e.g. 'ascii') are decoded as given.
     :type format: str, optional
     :return: the binary data as text
     :rtype: str
     """
+    if format.lower().replace('_', '-').startswith('utf-32'):
+        if in_bytes[:4] == b'\xff\xfe\x00\x00':
+            in_bytes, format = in_bytes[4:], 'utf-32-le'
+        elif in_bytes[:4] == b'\x00\x00\xfe\xff':
+            in_bytes, format = in_bytes[4:], 'utf-32-be'
+        elif format.lower().replace('_', '-') == 'utf-32':
+            format = 'utf-32-le'
     return in_bytes.decode(format).rstrip("\x00")
 
 def _parse_header_and_flags_(in_buffer_generator:Generator[bytes, int, None])->Box:
@@ -150,18 +161,20 @@ def _parse_spectral_tables_(in_buffer_generator:Generator[bytes, int, None], hea
             "<i",
             in_buffer_generator.send(4)
         )[0]
+        # Check the count before using it to size the read (a negative count would otherwise fail inside struct).
+        if num_data_pairs <= 0:
+            raise Exception(f'Spectral table {idx+1} returned a zero or negative number of data paris.')
         data_table = struct.unpack(
             f"<{num_data_pairs*2}f",
             in_buffer_generator.send(num_data_pairs*2*4)
         )
-        if num_data_pairs <= 0:
-            raise Exception(f'Spectral table {idx+1} returned a zero or negative number of data paris.') 
         table_out = pd.DataFrame({
                         "Wavelengths": np.asarray(data_table[::2]),
                         "RelativeWeight": np.asarray(data_table[1::2]),
                     })
-        if np.any(table_out.Wavelengths<= 0)  or np.any(table_out.RelativeWeight<= 0):
-            raise Exception(f'Found zero or negative wavelengths or relative weights in spectral table {idx+1}.') 
+        # TM-25 §4.7.4.2: zero or negative wavelengths and negative fluxes are fatal; a relative weight of zero is allowed.
+        if np.any(table_out.Wavelengths<= 0)  or np.any(table_out.RelativeWeight< 0):
+            raise Exception(f'Found zero or negative wavelengths or negative relative weights in spectral table {idx+1}.')
         return table_out, (num_data_pairs*2*4) + 4
 
     out = Box({})
@@ -177,12 +190,13 @@ def _parse_spectral_tables_(in_buffer_generator:Generator[bytes, int, None], hea
         out.SpectralTables = pd.concat(dfs, ignore_index=True)
         # Advance the buffer past the padding added to the end of the spectral table.
         # (the total spectral table block should be a number of bytes which is a multiple of 32 by definition).
+        # The padding is zero-valued 4-byte integers filling up to the next multiple of 32 bytes (TM-25 §4.7.4, Table 4-4).
+        n_padding_bytes = (32 - total_bytes_read % 32) % 32
         padding = struct.unpack(
-                f"<{(total_bytes_read%32)}i",
-                in_buffer_generator.send(
-                (total_bytes_read%32)*4)
+                f"<{n_padding_bytes//4}i",
+                in_buffer_generator.send(n_padding_bytes)
             )
-        if len(padding)>1 and int(np.sum(np.abs(padding)))>0:
+        if len(padding)>0 and int(np.sum(np.abs(padding)))>0:
             raise Exception('Found non-zero data in the expected spectral table padding.') 
     return out
 
@@ -231,12 +245,13 @@ def _define_ray_block_contents_from_header_and_flags_(header_and_flags:Box, addi
     """
     # Ray data should always have these else it is not valid
     ray_block_labels = ['XPosition', 'YPosition', 'ZPosition', 'XDirectionCosine', 'YDirectionCosine', 'ZDirectionCosine']
-    # In the below, if the flag(s) of each condition are set then ray data should have the properties added to the list or the file is not valid.
-    if header_and_flags.RadiantFluxStokesS0Flag == 1 or header_and_flags.StokesFlag == 1 or header_and_flags.SpectralDataIdentifier > 0:
+    # The known data flags alone define which columns are present (TM-25 §4.7.2): each column is included if and only if its flag is set.
+    # Combinations of flags and Spectral Data Identifier that are not allowed are rejected separately by _header_and_flags_error_checking_.
+    if header_and_flags.RadiantFluxStokesS0Flag == 1:
         ray_block_labels += ['RadiantFluxStokesS0']
     if header_and_flags.WavelengthFlag == 1:
         ray_block_labels += ['Wavelength']
-    if header_and_flags.LuminousFluxYTristimulusFlag == 1 and header_and_flags.SpectralDataIdentifier == 0:
+    if header_and_flags.LuminousFluxYTristimulusFlag == 1:
         ray_block_labels += ['LuminousFluxYTristimulus']
     if header_and_flags.StokesFlag == 1:
         ray_block_labels += ['StokesS1', 'StokesS2', 'StokesS3', 'PolarizationEllipseMajorAxis_XDirectionCosine', 'PolarizationEllipseMajorAxis_YDirectionCosine', 'PolarizationEllipseMajorAxis_ZDirectionCosine']
@@ -281,7 +296,7 @@ def _parse_ray_data_(in_buffer_generator:Generator[bytes, int, None], header_and
                     total_buffer_format, in_buffer_generator.send(len(ray_block_labels)*4*header_and_flags.NumberOfRays))).reshape(-1, len(ray_block_labels))
         df = pd.DataFrame(total_ray_data, columns=ray_block_labels)
         df.index.name = 'RayNumber'
-        out.RayData = df
+        out.RayData = _ray_data_error_checking_(df, header_and_flags)
     else:
         out.RayData = None
     return out
